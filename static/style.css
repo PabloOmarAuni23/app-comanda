@@ -114,17 +114,27 @@ h1, h2, h3 { font-family: 'Manrope', 'Avenir Next', sans-serif; }
 .ticket-head h2 { margin: 0; font-size: 15px; }
 .ticket-head p { margin: 4px 0 0; color: var(--muted); font-size: 11px; }
 .ticket-items { padding: 2px 16px; }
-.ticket-item { padding: 14px 0; border-bottom: 1px solid #ecebe3; }
+.ticket-item { margin: 0 -16px; padding: 14px 16px; border-bottom: 1px solid #ecebe3; border-left: 6px solid transparent; }
 .ticket-item:last-child { border-bottom: 0; }
 .ticket-item-head { display: flex; justify-content: space-between; gap: 10px; }
 .ticket-item-head strong { font-size: 13px; }
-.ticket-item-head span { color: var(--muted); font-size: 11px; white-space: nowrap; }
-.ticket-item p { margin: 6px 0 0; color: var(--orange); font-size: 11px; }
+.ticket-item-head span { color: var(--muted); font-size: 11px; font-weight: 700; white-space: nowrap; }
+.kitchen-timer { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 10px; padding: 9px 12px; border: 1px solid currentColor; border-radius: 5px; }
+.kitchen-timer strong { font: 800 22px/1 'Manrope', sans-serif; white-space: nowrap; }
+.kitchen-timer span { text-align: right; font-size: 12px; font-weight: 800; }
+.ticket-on-time { border-left-color: #34804d; background: #edf6ee; color: #245c37; }
+.kitchen-timer.ticket-on-time, .legend-on-time { color: #245c37; background: #dceedd; }
+.ticket-delayed { border-left-color: #bd8500; background: #fff7dc; color: #755000; }
+.kitchen-timer.ticket-delayed, .legend-delayed { color: #755000; background: #ffebb0; }
+.ticket-very-late { border-left-color: #d65b24; background: #fff0e4; color: #9b3516; }
+.kitchen-timer.ticket-very-late, .legend-very-late { color: #9b3516; background: #ffd5ba; }
+.ticket-cancel-risk { border-left-color: #b42318; background: #fff0ef; color: #8b1b13; }
+.kitchen-timer.ticket-cancel-risk, .legend-cancel-risk { color: #8b1b13; background: #ffd4d0; }
+.ticket-note { margin: 8px 0 0; color: inherit; font-size: 12px; font-weight: 600; }
+.kitchen-legend { display: flex; flex-wrap: wrap; gap: 7px; margin: -7px 0 22px; }
+.kitchen-legend span { padding: 7px 10px; border-radius: 4px; font-size: 11px; font-weight: 800; }
 .ticket-actions { display: flex; gap: 7px; margin-top: 11px; }
 .ticket-actions .button { min-height: 31px; }
-.ticket-young { border-left: 4px solid #73a483; }
-.ticket-mid { border-left: 4px solid var(--yellow); }
-.ticket-old { border-left: 4px solid var(--red); }
 .menu-category { margin: 25px 0 12px; font: 700 13px 'Manrope', sans-serif; text-transform: uppercase; }
 .menu-list { display: grid; gap: 1px; border-top: 1px solid var(--line); }
 .menu-row { display: grid; grid-template-columns: 1fr auto auto; align-items: center; gap: 12px; padding: 14px 2px; border-bottom: 1px solid var(--line); }
