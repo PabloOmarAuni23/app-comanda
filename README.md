@@ -29,6 +29,12 @@ Todos los teléfonos que abran la misma URL comparten el estado actual en el ser
 
 Este modo evita el costo del disco persistente y no guarda historial, pero no garantiza conservar una comanda abierta si nadie tiene la app activa o si Render reinicia el servicio. Para garantizar esa persistencia haría falta una base alojada aparte; no se configura aquí para mantener el costo en cero.
 
+### Instalar y ubicar el icono
+
+- Android: abrir la URL en Chrome y usar **Instalar aplicación** o **Agregar a pantalla de inicio**. Si el icono queda en el cajón de aplicaciones, mantenerlo presionado desde allí y arrastrarlo a la pantalla deseada. La búsqueda del teléfono normalmente no permite arrastrarlo.
+- iPhone: abrir la URL en Safari, tocar **Compartir** y después **Agregar a pantalla de inicio**. Luego mantener presionado el icono para moverlo.
+- Si el icono ya estaba agregado antes de una actualización, quitar ese acceso anterior y volver a agregarlo para que el teléfono use el icono actualizado.
+
 ## Privacidad y alcance
 
 No hay usuario, clave ni permisos por persona: cualquiera que tenga la URL puede ver y modificar las mesas, los pedidos y la carta. El nombre de atención se guarda solo en el teléfono y se adjunta a los pedidos. No publiques información sensible.
