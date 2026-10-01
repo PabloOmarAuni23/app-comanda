@@ -15,11 +15,10 @@ let lastToastTimer;
 let deferredInstallPrompt = null;
 let requestPending = false;
 
-waiterInput.value = localStorage.getItem("comanda-waiter") || "Equipo";
+waiterInput.value = "";
 waiterInput.addEventListener("change", () => {
-  const name = waiterInput.value.trim().slice(0, 40) || "Equipo";
+  const name = waiterInput.value.trim().slice(0, 40);
   waiterInput.value = name;
-  localStorage.setItem("comanda-waiter", name);
 });
 
 function escapeHtml(value) {
@@ -227,7 +226,6 @@ function showOpenTableDialog(table) {
     const waiter = data.waiter.trim().slice(0, 40);
     if (!waiter) return false;
     waiterInput.value = waiter;
-    localStorage.setItem("comanda-waiter", waiter);
     const opened = await sendAction({ type: "table_open", table_id: table.id, waiter }, `${table.name} abierta por ${waiter}.`);
     if (opened) {
       activeTableId = table.id;
@@ -255,8 +253,8 @@ function showProductDialog(dish = null) {
 }
 
 function showAddItemDialog(table, dish) {
-  const body = `<div class="dialog-product-line"><strong>${escapeHtml(dish.name)}</strong><span>${money(dish.price)}</span></div><label class="dialog-field">Cantidad<input name="quantity" type="number" min="1" max="99" value="1" required></label><label class="dialog-field">Nota para cocina<textarea name="note" maxlength="160" placeholder="Ej.: sin azúcar, bien tostado"></textarea></label>`;
-  showDialog({ eyebrow: table.name, title: "Agregar al pedido", body, submitLabel: "Agregar", onSubmit: (data) => sendAction({ type: "item_add", table_id: table.id, menu_id: dish.id, quantity: data.quantity, note: data.note, waiter: waiterInput.value }, `${dish.name} agregado.`) });
+  const body = `<div class="dialog-product-line"><strong>${escapeHtml(dish.name)}</strong><span>${money(dish.price)}</span></div><label class="dialog-field">Cantidad<div class="quantity-stepper"><button class="quantity-step" type="button" data-quantity-step="-1" aria-label="Disminuir cantidad">−</button><input name="quantity" type="number" min="1" max="99" value="1" inputmode="none" readonly aria-live="polite" required><button class="quantity-step" type="button" data-quantity-step="1" aria-label="Aumentar cantidad">+</button></div></label><label class="dialog-field">Nota para cocina<textarea name="note" maxlength="160" placeholder="Ej.: sin azúcar, bien tostado"></textarea></label>`;
+  showDialog({ eyebrow: table.name, title: "Agregar al pedido", body, submitLabel: "Agregar", onSubmit: (data) => sendAction({ type: "item_add", table_id: table.id, menu_id: dish.id, quantity: data.quantity, note: data.note, waiter: waiterInput.value.trim() || table.opened_by }, `${dish.name} agregado.`) });
 }
 
 function setView(view) {
@@ -324,6 +322,14 @@ appRoot.addEventListener("click", async (event) => {
 
 document.querySelector("#dialog").addEventListener("click", (event) => {
   if (event.target.closest("[data-close-dialog]")) dialog.close();
+  const stepButton = event.target.closest("[data-quantity-step]");
+  if (stepButton) {
+    const quantityInput = dialogBody.querySelector('input[name="quantity"]');
+    if (!quantityInput) return;
+    const current = Number(quantityInput.value) || 1;
+    const next = Math.max(Number(quantityInput.min), Math.min(Number(quantityInput.max), current + Number(stepButton.dataset.quantityStep)));
+    quantityInput.value = String(next);
+  }
 });
 
 window.addEventListener("beforeinstallprompt", (event) => {

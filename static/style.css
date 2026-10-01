@@ -152,6 +152,10 @@ h1, h2, h3 { font-family: 'Manrope', 'Avenir Next', sans-serif; }
 .dialog-field input, .dialog-field textarea, .dialog-field select { width: 100%; min-height: 42px; padding: 10px 11px; border: 1px solid var(--line); border-radius: 5px; outline: 0; color: var(--ink); background: white; font-size: 14px; }
 .dialog-field textarea { min-height: 78px; resize: vertical; }
 .dialog-field input:focus, .dialog-field textarea:focus, .dialog-field select:focus { border-color: #67917a; box-shadow: 0 0 0 3px rgba(73,121,91,.12); }
+.quantity-stepper { display: grid; grid-template-columns: 52px minmax(70px, 1fr) 52px; gap: 8px; width: min(100%, 240px); }
+.quantity-step { min-height: 48px; border: 1px solid var(--line); border-radius: 5px; color: var(--green); background: var(--green-soft); cursor: pointer; font-size: 24px; font-weight: 700; }
+.quantity-step:active { background: #d4e3d8; }
+.quantity-stepper input { min-height: 48px; padding: 8px; text-align: center; color: var(--ink); font: 800 18px 'Manrope', sans-serif; }
 .dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px; }
 .dialog-actions button { min-width: 100px; }
 .toast { position: fixed; right: 20px; bottom: 20px; z-index: 5; max-width: min(380px, calc(100% - 40px)); padding: 12px 16px; border-radius: 6px; color: white; background: var(--ink); box-shadow: var(--shadow); opacity: 0; transform: translateY(8px); pointer-events: none; transition: .2s; font-size: 13px; }
