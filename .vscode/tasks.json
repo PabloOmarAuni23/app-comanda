@@ -1,0 +1,60 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Comanda: iniciar servidor",
+			"type": "shell",
+			"command": "py",
+			"args": [
+				"app.py"
+			],
+			"isBackground": true,
+			"problemMatcher": [],
+			"group": "build"
+		},
+		{
+			"label": "Comanda: instalar dependencias",
+			"type": "shell",
+			"command": "py",
+			"args": [
+				"-m",
+				"pip",
+				"install",
+				"-r",
+				"requirements.txt"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "Comanda: pruebas",
+			"type": "shell",
+			"command": "py",
+			"args": [
+				"-m",
+				"unittest",
+				"discover",
+				"-s",
+				"tests",
+				"-v"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "Comanda: pruebas finales",
+			"type": "shell",
+			"command": "py",
+			"args": [
+				"-m",
+				"unittest",
+				"discover",
+				"-s",
+				"tests",
+				"-v"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		}
+	]
+}

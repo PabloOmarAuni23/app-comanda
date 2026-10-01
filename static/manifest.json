@@ -1,0 +1,13 @@
+{
+  "name": "Comanda del Bar",
+  "short_name": "Comanda",
+  "description": "Mesas, pedidos y cocina sincronizados.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f3f0e7",
+  "theme_color": "#f3f0e7",
+  "icons": [
+    { "src": "/static/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}
