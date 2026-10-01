@@ -168,8 +168,8 @@ function kitchenTiming(timestamp) {
   const minutes = Math.floor(elapsedMs / 60000);
 
   if (elapsedMs <= 15 * 60000) return { minutes, className: "ticket-on-time", label: "A tiempo · hasta 15 min" };
-  if (elapsedMs <= 25 * 60000) return { minutes, className: "ticket-delayed", label: "Con retraso · 15–25 min" };
-  if (elapsedMs <= 35 * 60000) return { minutes, className: "ticket-very-late", label: "Muy retrasado · 25–35 min" };
+  if (elapsedMs <= 25 * 60000) return { minutes, className: "ticket-delayed", label: "Con retraso · más de 15 y hasta 25 min" };
+  if (elapsedMs <= 35 * 60000) return { minutes, className: "ticket-very-late", label: "Muy retrasado · más de 25 y hasta 35 min" };
   return { minutes, className: "ticket-cancel-risk", label: "Riesgo de cancelación · más de 35 min" };
 }
 
