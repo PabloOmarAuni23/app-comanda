@@ -2,12 +2,6 @@ services:
   - type: web
     name: app-comanda
     runtime: python
+    plan: free
     buildCommand: pip install -r requirements.txt
     startCommand: gunicorn app:app --workers 1 --threads 8 --timeout 120
-    disk:
-      name: comanda-data
-      mountPath: /var/data
-      sizeGB: 1
-    envVars:
-      - key: DATABASE_PATH
-        value: /var/data/comanda.sqlite3

@@ -18,14 +18,16 @@ Aplicación web instalable para compartir mesas, pedidos, carta y cocina entre v
 
 La base local se crea en `instance/comanda.sqlite3`. Para probar desde otro teléfono en la misma red, abrir la dirección IP local de la computadora en lugar de `localhost`.
 
-## Publicar con GitHub y Render
+## Publicar gratis con GitHub y Render
 
 1. Subir esta carpeta a un repositorio de GitHub.
-2. En Render, crear un servicio web nuevo desde ese repositorio y conservar `render.yaml`.
-3. Esperar que termine la publicación. Render instala las dependencias, inicia el servidor y guarda la base en un disco persistente; el disco puede requerir un plan pago.
+2. En Render, crear un servicio web nuevo desde ese repositorio y conservar `render.yaml`; el manifiesto selecciona el plan `free` y no agrega discos.
+3. Verificar que Render muestre el plan **Free ($0)** antes de crear el servicio. No elegir ni confirmar un plan pago.
 4. Compartir la URL HTTPS pública del servicio con el equipo. Desde esa URL, en el navegador del teléfono se puede elegir **Agregar a pantalla de inicio** o **Instalar aplicación**.
 
-Todos los teléfonos que abran la misma URL comparten el mismo estado. Las pantallas consultan cambios cada dos segundos y las acciones se guardan en el servidor.
+Todos los teléfonos que abran la misma URL comparten el estado actual en el servidor. El plan gratuito duerme después de 15 minutos sin visitas y puede reiniciarse; al dormir, reiniciar o volver a desplegarse, Render borra los archivos locales. Por eso las mesas abiertas y los cambios manuales de la carta pueden perderse antes de limpiar la mesa. Al volver, el servidor carga la carta inicial y todas las mesas libres. La primera visita tras dormir puede tardar alrededor de un minuto.
+
+Este modo evita el costo del disco persistente y no guarda historial, pero no garantiza conservar una comanda abierta si nadie tiene la app activa o si Render reinicia el servicio. Para garantizar esa persistencia haría falta una base alojada aparte; no se configura aquí para mantener el costo en cero.
 
 ## Privacidad y alcance
 
