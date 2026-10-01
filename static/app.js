@@ -221,6 +221,23 @@ function showAddTableDialog() {
   showDialog({ eyebrow: "Salón", title: "Agregar mesa", body: `<label class="dialog-field">Nombre o número<input name="name" maxlength="40" placeholder="Por ejemplo: Patio 1" required></label>`, submitLabel: "Agregar mesa", onSubmit: (data) => sendAction({ type: "table_create", name: data.name }, "Mesa agregada.") });
 }
 
+function showOpenTableDialog(table) {
+  const body = `<label class="dialog-field">Nombre del mozo o moza<input name="waiter" maxlength="40" value="${escapeHtml(waiterInput.value)}" placeholder="Escribí tu nombre" required></label>`;
+  showDialog({ eyebrow: table.name, title: "¿Quién abre esta mesa?", body, submitLabel: "Abrir mesa", onSubmit: async (data) => {
+    const waiter = data.waiter.trim().slice(0, 40);
+    if (!waiter) return false;
+    waiterInput.value = waiter;
+    localStorage.setItem("comanda-waiter", waiter);
+    const opened = await sendAction({ type: "table_open", table_id: table.id, waiter }, `${table.name} abierta por ${waiter}.`);
+    if (opened) {
+      activeTableId = table.id;
+      activeView = "table-detail";
+      render();
+    }
+    return opened;
+  } });
+}
+
 function showProductDialog(dish = null) {
   const editing = Boolean(dish);
   const categories = [...new Set(state.menu.map((entry) => entry.category))];
@@ -264,8 +281,7 @@ appRoot.addEventListener("click", async (event) => {
     const table = state.tables.find((entry) => entry.id === tableButton.dataset.table);
     if (!table) return;
     if (table.status === "free") {
-      const opened = await sendAction({ type: "table_open", table_id: table.id, waiter: waiterInput.value }, `${table.name} abierta.`);
-      if (opened) { activeTableId = table.id; activeView = "table-detail"; render(); }
+      showOpenTableDialog(table);
     } else {
       activeTableId = table.id;
       activeView = "table-detail";
