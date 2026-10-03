@@ -108,20 +108,24 @@ h1, h2, h3 { font-family: 'Manrope', 'Avenir Next', sans-serif; }
 .product-button strong { font: 700 14px 'Manrope', sans-serif; }
 .product-button span { color: var(--muted); font-size: 11px; }
 .product-button b { color: var(--green); font-size: 13px; }
-.kitchen-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.kitchen-grid { display: grid; grid-template-columns: 1fr; gap: 8px; }
 .kitchen-ticket { overflow: hidden; border: 1px solid var(--line); border-radius: 7px; background: var(--surface); box-shadow: var(--shadow); }
-.ticket-head { display: flex; justify-content: space-between; gap: 12px; padding: 15px 17px; border-bottom: 1px solid var(--line); }
-.ticket-head h2 { margin: 0; font-size: 15px; }
-.ticket-head p { margin: 4px 0 0; color: var(--muted); font-size: 11px; }
-.ticket-items { padding: 2px 16px; }
-.ticket-item { margin: 0 -16px; padding: 14px 16px; border-bottom: 1px solid #ecebe3; border-left: 6px solid transparent; }
+.ticket-head { display: flex; justify-content: space-between; gap: 12px; padding: 8px 12px; border-bottom: 1px solid var(--line); }
+.ticket-head h2 { margin: 0; font-size: 14px; }
+.ticket-head p { margin: 2px 0 0; color: var(--muted); font-size: 10px; }
+.ticket-items { padding: 0 12px; }
+.ticket-item { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; column-gap: 12px; row-gap: 4px; margin: 0 -12px; padding: 7px 10px; border-bottom: 1px solid #ecebe3; border-left: 4px solid transparent; }
 .ticket-item:last-child { border-bottom: 0; }
-.ticket-item-head { display: flex; justify-content: space-between; gap: 10px; }
-.ticket-item-head strong { font-size: 13px; }
-.ticket-item-head span { color: var(--muted); font-size: 11px; font-weight: 700; white-space: nowrap; }
-.kitchen-timer { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 10px; padding: 9px 12px; border: 1px solid currentColor; border-radius: 5px; }
-.kitchen-timer strong { font: 800 22px/1 'Manrope', sans-serif; white-space: nowrap; }
-.kitchen-timer span { text-align: right; font-size: 12px; font-weight: 800; }
+.ticket-item-head { grid-column: 1 / -1; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.ticket-item-head strong { font-size: 12px; }
+.ticket-item-head > span { color: var(--muted); font-size: 10px; font-weight: 700; white-space: nowrap; }
+.ticket-priority { box-shadow: inset 4px 0 #e27b2d; }
+.priority-badge { display: inline-block; margin-right: 7px; padding: 3px 6px; border-radius: 3px; color: #71320c; background: #ffe0bf; font-size: 10px; font-weight: 800; }
+.priority-toggle { display: inline-flex; align-items: center; gap: 4px; color: #71320c; font-size: 10px; font-weight: 700; white-space: nowrap; cursor: pointer; }
+.priority-toggle input { width: 15px; height: 15px; margin: 0; accent-color: #d96d26; }
+.kitchen-timer { grid-column: 1; display: flex; align-items: center; justify-content: flex-start; gap: 7px; min-width: 0; margin: 0; padding: 0; border: 0; }
+.kitchen-timer strong { font: 800 16px/1 'Manrope', sans-serif; white-space: nowrap; }
+.kitchen-timer span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10px; font-weight: 800; }
 .ticket-on-time { border-left-color: #34804d; background: #edf6ee; color: #245c37; }
 .kitchen-timer.ticket-on-time, .legend-on-time { color: #245c37; background: #dceedd; }
 .ticket-delayed { border-left-color: #bd8500; background: #fff7dc; color: #755000; }
@@ -130,11 +134,11 @@ h1, h2, h3 { font-family: 'Manrope', 'Avenir Next', sans-serif; }
 .kitchen-timer.ticket-very-late, .legend-very-late { color: #9b3516; background: #ffd5ba; }
 .ticket-cancel-risk { border-left-color: #b42318; background: #fff0ef; color: #8b1b13; }
 .kitchen-timer.ticket-cancel-risk, .legend-cancel-risk { color: #8b1b13; background: #ffd4d0; }
-.ticket-note { margin: 8px 0 0; color: inherit; font-size: 12px; font-weight: 600; }
-.kitchen-legend { display: flex; flex-wrap: wrap; gap: 7px; margin: -7px 0 22px; }
+.ticket-note { grid-column: 1; margin: 0; color: inherit; font-size: 10px; font-weight: 600; }
+.ticket-actions { grid-column: 2; grid-row: 2 / span 2; display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 4px; margin: 0; }
+.ticket-actions .button { min-height: 27px; padding: 0 8px; font-size: 10px; }
+.kitchen-legend { display: flex; flex-wrap: wrap; gap: 6px; margin: -7px 0 14px; }
 .kitchen-legend span { padding: 7px 10px; border-radius: 4px; font-size: 11px; font-weight: 800; }
-.ticket-actions { display: flex; gap: 7px; margin-top: 11px; }
-.ticket-actions .button { min-height: 31px; }
 .menu-category { margin: 25px 0 12px; font: 700 13px 'Manrope', sans-serif; text-transform: uppercase; }
 .menu-list { display: grid; gap: 1px; border-top: 1px solid var(--line); }
 .menu-row { display: grid; grid-template-columns: 1fr auto auto; align-items: center; gap: 12px; padding: 14px 2px; border-bottom: 1px solid var(--line); }
@@ -152,6 +156,9 @@ h1, h2, h3 { font-family: 'Manrope', 'Avenir Next', sans-serif; }
 .dialog-field input, .dialog-field textarea, .dialog-field select { width: 100%; min-height: 42px; padding: 10px 11px; border: 1px solid var(--line); border-radius: 5px; outline: 0; color: var(--ink); background: white; font-size: 14px; }
 .dialog-field textarea { min-height: 78px; resize: vertical; }
 .dialog-field input:focus, .dialog-field textarea:focus, .dialog-field select:focus { border-color: #67917a; box-shadow: 0 0 0 3px rgba(73,121,91,.12); }
+.priority-field { display: flex; align-items: center; gap: 8px; margin: 15px 0; color: var(--ink); font-size: 13px; font-weight: 700; }
+.priority-field input { width: 18px; height: 18px; margin: 0; accent-color: #d96d26; }
+.priority-field small { margin-left: auto; color: var(--muted); font-size: 11px; font-weight: 500; }
 .quantity-stepper { display: grid; grid-template-columns: 52px minmax(70px, 1fr) 52px; gap: 8px; width: min(100%, 240px); }
 .quantity-step { min-height: 48px; border: 1px solid var(--line); border-radius: 5px; color: var(--green); background: var(--green-soft); cursor: pointer; font-size: 24px; font-weight: 700; }
 .quantity-step:active { background: #d4e3d8; }

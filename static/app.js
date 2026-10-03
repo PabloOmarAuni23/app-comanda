@@ -174,16 +174,26 @@ function kitchenTiming(timestamp) {
 
 function renderKitchen() {
   const tickets = state.tables.filter((table) => table.status === "open" && table.items.some((item) => ["sent", "preparing", "suspended"].includes(item.status)));
+  tickets.sort((left, right) => {
+    const leftPriority = left.items.some((item) => item.priority && ["sent", "preparing", "suspended"].includes(item.status));
+    const rightPriority = right.items.some((item) => item.priority && ["sent", "preparing", "suspended"].includes(item.status));
+    if (leftPriority !== rightPriority) return leftPriority ? -1 : 1;
+    const leftSentAt = Math.min(...left.items.filter((item) => ["sent", "preparing", "suspended"].includes(item.status)).map((item) => Date.parse(item.sent_at || "") || 0));
+    const rightSentAt = Math.min(...right.items.filter((item) => ["sent", "preparing", "suspended"].includes(item.status)).map((item) => Date.parse(item.sent_at || "") || 0));
+    return leftSentAt - rightSentAt;
+  });
   const count = tickets.reduce((sum, table) => sum + table.items.filter((item) => ["sent", "preparing", "suspended"].includes(item.status)).length, 0);
   const cards = tickets.map((table) => {
-      const items = table.items.filter((item) => ["sent", "preparing", "suspended"].includes(item.status));
+      const items = table.items.filter((item) => ["sent", "preparing", "suspended"].includes(item.status)).sort((left, right) => Number(Boolean(right.priority)) - Number(Boolean(left.priority)) || (Date.parse(left.sent_at || "") || 0) - (Date.parse(right.sent_at || "") || 0));
     const renderedItems = items.map((item) => {
       const timing = kitchenTiming(item.sent_at);
+      const priorityBadge = item.priority ? `<span class="priority-badge">Prioridad</span>` : "";
       const actionButtons = item.status === "sent"
         ? `<button class="button button-primary button-small" data-action="item-status" data-table-id="${escapeHtml(table.id)}" data-item-id="${escapeHtml(item.id)}" data-status="preparing">Empezar</button>`
         : "";
       const otherButtons = `<button class="button button-secondary button-small" data-action="item-status" data-table-id="${escapeHtml(table.id)}" data-item-id="${escapeHtml(item.id)}" data-status="ready">Listo</button><button class="button button-secondary button-small" data-action="item-status" data-table-id="${escapeHtml(table.id)}" data-item-id="${escapeHtml(item.id)}" data-status="${item.status === "suspended" ? "preparing" : "suspended"}">${item.status === "suspended" ? "Reanudar" : "Suspender"}</button>`;
-      return `<article class="ticket-item ${timing.className}"><div class="ticket-item-head"><strong>${item.quantity} × ${escapeHtml(item.name)}</strong><span>${statusLabel(item.status)}</span></div><div class="kitchen-timer" role="timer" aria-label="Pedido hace ${timing.minutes} minutos: ${timing.label}"><strong>${timing.minutes} min</strong><span>${timing.label}</span></div>${item.note ? `<p class="ticket-note">Nota: ${escapeHtml(item.note)}</p>` : ""}<div class="ticket-actions">${actionButtons}${otherButtons}</div></article>`;
+      const priorityToggle = `<label class="priority-toggle"><input type="checkbox" data-action="item-priority" data-table-id="${escapeHtml(table.id)}" data-item-id="${escapeHtml(item.id)}" ${item.priority ? "checked" : ""}><span>Prioridad</span></label>`;
+      return `<article class="ticket-item ${timing.className} ${item.priority ? "ticket-priority" : ""}"><div class="ticket-item-head"><strong>${item.quantity} × ${escapeHtml(item.name)}</strong><span>${priorityBadge}${statusLabel(item.status)}</span>${priorityToggle}</div><div class="kitchen-timer" role="timer" aria-label="Pedido hace ${timing.minutes} minutos: ${timing.label}"><strong>${timing.minutes} min</strong><span>${timing.label}</span></div>${item.note ? `<p class="ticket-note">Nota: ${escapeHtml(item.note)}</p>` : ""}<div class="ticket-actions">${actionButtons}${otherButtons}</div></article>`;
     }).join("");
     return `<section class="kitchen-ticket"><header class="ticket-head"><div><h2>${escapeHtml(table.name)}</h2><p>Abierta por ${escapeHtml(table.opened_by)}</p></div><span class="status open">${items.length} ${items.length === 1 ? "producto" : "productos"}</span></header><div class="ticket-items">${renderedItems}</div></section>`;
   }).join("");
@@ -253,8 +263,8 @@ function showProductDialog(dish = null) {
 }
 
 function showAddItemDialog(table, dish) {
-  const body = `<div class="dialog-product-line"><strong>${escapeHtml(dish.name)}</strong><span>${money(dish.price)}</span></div><label class="dialog-field">Cantidad<div class="quantity-stepper"><button class="quantity-step" type="button" data-quantity-step="-1" aria-label="Disminuir cantidad">−</button><input name="quantity" type="number" min="1" max="99" value="1" inputmode="none" readonly aria-live="polite" required><button class="quantity-step" type="button" data-quantity-step="1" aria-label="Aumentar cantidad">+</button></div></label><label class="dialog-field">Nota para cocina<textarea name="note" maxlength="160" placeholder="Ej.: sin azúcar, bien tostado"></textarea></label>`;
-  showDialog({ eyebrow: table.name, title: "Agregar al pedido", body, submitLabel: "Agregar", onSubmit: (data) => sendAction({ type: "item_add", table_id: table.id, menu_id: dish.id, quantity: data.quantity, note: data.note, waiter: waiterInput.value.trim() || table.opened_by }, `${dish.name} agregado.`) });
+  const body = `<div class="dialog-product-line"><strong>${escapeHtml(dish.name)}</strong><span>${money(dish.price)}</span></div><label class="dialog-field">Cantidad<div class="quantity-stepper"><button class="quantity-step" type="button" data-quantity-step="-1" aria-label="Disminuir cantidad">−</button><input name="quantity" type="number" min="1" max="99" value="1" inputmode="none" readonly aria-live="polite" required><button class="quantity-step" type="button" data-quantity-step="1" aria-label="Aumentar cantidad">+</button></div></label><label class="priority-field"><input name="priority" type="checkbox"><span>Prioridad</span><small>Producto rápido de preparar</small></label><label class="dialog-field">Nota para cocina<textarea name="note" maxlength="160" placeholder="Ej.: sin azúcar, bien tostado"></textarea></label>`;
+  showDialog({ eyebrow: table.name, title: "Agregar al pedido", body, submitLabel: "Agregar", onSubmit: (data) => sendAction({ type: "item_add", table_id: table.id, menu_id: dish.id, quantity: data.quantity, note: data.note, priority: data.priority === "on", waiter: waiterInput.value.trim() || table.opened_by }, `${dish.name} agregado.`) });
 }
 
 function setView(view) {
@@ -292,6 +302,16 @@ appRoot.addEventListener("click", async (event) => {
     const table = state.tables.find((entry) => entry.id === activeTableId);
     const dish = state.menu.find((entry) => entry.id === productButton.dataset.addProduct);
     if (table && dish) showAddItemDialog(table, dish);
+    return;
+  }
+  const priorityInput = event.target.closest('input[data-action="item-priority"]');
+  if (priorityInput) {
+    await sendAction({
+      type: "item_priority",
+      table_id: priorityInput.dataset.tableId,
+      item_id: priorityInput.dataset.itemId,
+      priority: priorityInput.checked,
+    }, priorityInput.checked ? "Pedido marcado como prioridad." : "Prioridad quitada.");
     return;
   }
   const actionButton = event.target.closest("[data-action]");

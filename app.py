@@ -1,5 +1,6 @@
 import json
 import os
+import re
 import sqlite3
 import uuid
 from contextlib import closing
@@ -15,6 +16,48 @@ DATABASE_PATH = Path(os.environ.get("DATABASE_PATH", "instance/comanda.sqlite3")
 
 def now_iso():
     return datetime.now(timezone.utc).isoformat()
+
+
+def normalize_menu_name(value):
+    return re.sub(r"[^a-z0-9]+", " ", str(value or "").lower()).strip()
+
+
+def merge_menu_entries(existing_menu, incoming_menu):
+    merged = [dict(item) for item in existing_menu]
+    index_by_name = {normalize_menu_name(item.get("name", "")): idx for idx, item in enumerate(merged)}
+
+    for item in incoming_menu or []:
+        if not isinstance(item, dict):
+            continue
+        name = str(item.get("name", "")).strip()
+        category = str(item.get("category", "")).strip()
+        price = int(item.get("price", 0) or 0)
+        if not name or not category or price < 0:
+            continue
+
+        key = normalize_menu_name(name)
+        if key in index_by_name:
+            current = merged[index_by_name[key]]
+            current.update({
+                "name": name,
+                "category": category,
+                "description": str(item.get("description", current.get("description", "")))[:120],
+                "price": price,
+                "available": bool(item.get("available", current.get("available", True))),
+            })
+            continue
+
+        merged.append({
+            "id": str(item.get("id") or uuid.uuid4()),
+            "name": name,
+            "description": str(item.get("description", ""))[:120],
+            "category": category,
+            "price": price,
+            "available": bool(item.get("available", True)),
+        })
+        index_by_name[key] = len(merged) - 1
+
+    return merged
 
 
 def initial_state():
@@ -97,7 +140,7 @@ def mutate_state(action):
             table["items"].append({
                 "id": str(uuid.uuid4()), "menu_id": dish["id"], "name": dish["name"], "price": dish["price"],
                 "quantity": quantity, "note": str(action.get("note", "")).strip()[:160], "status": "draft", "added_by": str(action.get("waiter", "Equipo")).strip()[:40] or "Equipo",
-                "created_at": stamp, "sent_at": None,
+                "priority": action.get("priority") is True, "created_at": stamp, "sent_at": None,
             })
         elif action_type == "order_send":
             table = find_table()
@@ -113,6 +156,12 @@ def mutate_state(action):
             if item is None or status not in {"preparing", "ready", "suspended"}:
                 raise ValueError("No se pudo actualizar el producto.")
             item["status"] = status
+        elif action_type == "item_priority":
+            table = find_table()
+            item = next((entry for entry in table["items"] if entry["id"] == str(action.get("item_id", ""))), None)
+            if item is None or item["status"] not in {"sent", "preparing", "suspended"}:
+                raise ValueError("No se pudo actualizar la prioridad del producto.")
+            item["priority"] = action.get("priority") is True
         elif action_type == "table_paid":
             table = find_table()
             if table["status"] != "open":
@@ -146,6 +195,11 @@ def mutate_state(action):
             dish.update(name=name, category=category, description=description, price=price, available=bool(action.get("available", True)))
         elif action_type == "menu_delete":
             menu[:] = [entry for entry in menu if entry["id"] != str(action.get("menu_id", ""))]
+        elif action_type == "menu_import":
+            incoming_menu = action.get("items", [])
+            if not isinstance(incoming_menu, list):
+                raise ValueError("La importación de la carta debe venir como una lista de productos.")
+            menu[:] = merge_menu_entries(menu, incoming_menu)
         else:
             raise ValueError("Acción no reconocida.")
 
