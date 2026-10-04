@@ -11,6 +11,7 @@ let state = null;
 let activeView = "home";
 let activeTableId = null;
 let activeCategory = "Todas";
+let kitchenTimingFilter = "all";
 let lastToastTimer;
 let deferredInstallPrompt = null;
 let requestPending = false;
@@ -189,25 +190,27 @@ function renderKitchen() {
     const rightSentAt = Math.min(...right.items.filter((item) => ["sent", "preparing", "suspended"].includes(item.status)).map((item) => Date.parse(item.sent_at || "") || 0));
     return leftSentAt - rightSentAt;
   });
-  const count = tickets.reduce((sum, table) => sum + table.items.filter((item) => ["sent", "preparing", "suspended"].includes(item.status)).length, 0);
+  const activeItems = tickets.flatMap((table) => table.items.filter((item) => ["sent", "preparing", "suspended"].includes(item.status)).map((item) => ({ table, item, timing: kitchenTiming(item.sent_at) })));
+  const countFor = (className) => activeItems.filter(({ timing }) => timing.className === className).length;
+  const filters = [["all", "Todos", activeItems.length], ["ticket-on-time", "A tiempo", countFor("ticket-on-time")], ["ticket-delayed", "Demorado", countFor("ticket-delayed")], ["ticket-very-late", "Muy demorado", countFor("ticket-very-late")], ["ticket-cancel-risk", "Crítico", countFor("ticket-cancel-risk")]]
+    .map(([key, label, amount]) => `<button class="kitchen-filter ${key === kitchenTimingFilter ? "active" : ""} ${key === "all" ? "" : key}" data-kitchen-filter="${key}" type="button">${label} <span>${amount}</span></button>`).join("");
   const cards = tickets.map((table) => {
     const items = table.items.filter((item) => ["sent", "preparing", "suspended"].includes(item.status)).sort((left, right) => Number(Boolean(right.priority)) - Number(Boolean(left.priority)) || (Date.parse(left.sent_at || "") || 0) - (Date.parse(right.sent_at || "") || 0));
     const oldestItem = items.reduce((oldest, item) => (Date.parse(item.sent_at || "") || 0) < (Date.parse(oldest.sent_at || "") || 0) ? item : oldest);
     const timing = kitchenTiming(oldestItem.sent_at);
+    if (kitchenTimingFilter !== "all" && timing.className !== kitchenTimingFilter) return "";
     const renderedItems = items.map((item) => {
-      const priorityBadge = item.priority ? `<span class="priority-badge">Prioridad</span>` : "";
-      const actionButtons = item.status === "sent"
-        ? `<button class="button button-primary button-small" data-action="item-status" data-table-id="${escapeHtml(table.id)}" data-item-id="${escapeHtml(item.id)}" data-status="preparing">Empezar</button>`
-        : "";
-      const otherButtons = `<button class="button button-secondary button-small" data-action="item-status" data-table-id="${escapeHtml(table.id)}" data-item-id="${escapeHtml(item.id)}" data-status="ready">Listo</button><button class="button button-secondary button-small" data-action="item-status" data-table-id="${escapeHtml(table.id)}" data-item-id="${escapeHtml(item.id)}" data-status="${item.status === "suspended" ? "preparing" : "suspended"}">${item.status === "suspended" ? "Reanudar" : "Suspender"}</button>`;
+      const options = item.status === "sent" ? [["sent", "Pendiente"], ["preparing", "En preparación"], ["ready", "Terminado"], ["suspended", "Demorado"]] : item.status === "preparing" ? [["preparing", "En preparación"], ["ready", "Terminado"], ["suspended", "Demorado"]] : [["suspended", "Demorado"], ["preparing", "En preparación"], ["ready", "Terminado"]];
+      const optionMarkup = options.map(([value, label]) => `<option value="${value}" ${item.status === value ? "selected" : ""}>${label}</option>`).join("");
+      const nextStatus = item.status === "preparing" ? "ready" : "preparing";
+      const nextLabel = nextStatus === "preparing" ? "Empezar" : "Terminar producto";
       const priorityToggle = `<label class="priority-toggle"><input type="checkbox" data-action="item-priority" data-table-id="${escapeHtml(table.id)}" data-item-id="${escapeHtml(item.id)}" ${item.priority ? "checked" : ""}><span>Prioridad</span></label>`;
-      const kitchenStatus = item.status === "sent" ? "Pendiente" : statusLabel(item.status);
-      return `<article class="ticket-item ${item.priority ? "ticket-priority" : ""}"><div class="ticket-product"><span class="ticket-item-quantity">${item.quantity}</span><div><strong>${escapeHtml(item.name)}</strong>${item.note ? `<p class="ticket-note">${escapeHtml(item.note)}</p>` : ""}</div></div><div class="ticket-item-controls"><span class="status ${item.status}">${priorityBadge}${kitchenStatus}</span><div class="ticket-actions">${actionButtons}${otherButtons}</div></div><div class="ticket-item-priority">${priorityToggle}</div></article>`;
+      return `<article class="ticket-item ${item.priority ? "ticket-priority" : ""}"><div class="ticket-product"><span class="ticket-item-quantity">${item.quantity}</span><div><strong>${escapeHtml(item.name)}</strong>${item.note ? `<p class="ticket-note">${escapeHtml(item.note)}</p>` : ""}</div></div><div class="ticket-item-controls"><select class="kitchen-state-select" aria-label="Estado de ${escapeHtml(item.name)}" data-action="item-status-select" data-table-id="${escapeHtml(table.id)}" data-item-id="${escapeHtml(item.id)}">${optionMarkup}</select><button class="kitchen-advance" type="button" title="${nextLabel}" aria-label="${nextLabel}" data-action="item-status" data-table-id="${escapeHtml(table.id)}" data-item-id="${escapeHtml(item.id)}" data-status="${nextStatus}">▶</button></div><div class="ticket-item-priority">${priorityToggle}</div></article>`;
     }).join("");
-    return `<section class="kitchen-ticket"><header class="ticket-head ${timing.className}"><div class="ticket-heading-main"><div class="ticket-heading-top"><span class="ticket-sent-time">${kitchenSentTime(oldestItem.sent_at)}</span><span class="kitchen-timer" role="timer" aria-label="Pedido hace ${timing.minutes} minutos: ${timing.label}"><strong>${timing.minutes} min</strong><span>${timing.label}</span></span></div><h2>${escapeHtml(table.name)}</h2><p>Principal · Atiende ${escapeHtml(table.opened_by)}</p></div><span class="status open">${items.length} ${items.length === 1 ? "producto" : "productos"}</span></header><div class="ticket-items">${renderedItems}</div><footer class="ticket-footer"><span class="ticket-footer-meta">${items.length} productos pendientes</span><button class="button button-finish-all" data-action="finish-ticket" data-table-id="${escapeHtml(table.id)}">Terminar todo</button></footer></section>`;
+    return `<section class="kitchen-ticket"><header class="ticket-head ${timing.className}"><div class="ticket-heading-main"><div class="ticket-heading-top"><span class="ticket-sent-time">${kitchenSentTime(oldestItem.sent_at)}</span><span class="kitchen-timer" role="timer" aria-label="Pedido hace ${timing.minutes} minutos: ${timing.label}"><strong>${timing.minutes} min</strong></span></div><h2>${escapeHtml(table.name)}</h2><p>Principal · Atiende ${escapeHtml(table.opened_by)}</p></div><span class="status open">${items.length} prod.</span></header><div class="ticket-items">${renderedItems}</div><footer class="ticket-footer"><span class="ticket-footer-meta">${items.length} pendientes</span><button class="button button-finish-all" data-action="finish-ticket" data-table-id="${escapeHtml(table.id)}">Terminar todo</button></footer></section>`;
   }).join("");
   const readyCount = state.tables.reduce((sum, table) => sum + table.items.filter((item) => item.status === "ready").length, 0);
-  appRoot.innerHTML = `${pageHeading("Producción", "Cocina", `${count} productos activos · el tiempo cuenta desde que se envió el pedido.`)}<div class="kitchen-legend" aria-label="Tiempos de cocina"><span class="legend-on-time">A tiempo · hasta 15 min</span><span class="legend-delayed">Con retraso · más de 15 y hasta 25 min</span><span class="legend-very-late">Muy retrasado · más de 25 y hasta 35 min</span><span class="legend-cancel-risk">Riesgo de cancelación · más de 35 min</span></div><div class="section-title"><h2>En preparación</h2><span class="status ready">${readyCount} listos para retirar</span></div>${tickets.length ? `<div class="kitchen-grid">${cards}</div>` : `<section class="section-panel"><div class="empty-state"><div class="empty-mark">♨</div><h2>Cocina al día</h2><p>Los pedidos enviados por los mozos van a aparecer acá.</p></div></section>`}`;
+  appRoot.innerHTML = `<div class="kitchen-board-heading"><div><p class="eyebrow">Producción</p><h1>Cocina</h1></div><span class="status ready">${readyCount} listos</span></div><div class="kitchen-toolbar" aria-label="Filtrar comandas">${filters}</div><div class="kitchen-grid">${cards || `<section class="section-panel kitchen-empty"><div class="empty-state"><div class="empty-mark">♨</div><h2>${activeItems.length ? "No hay pedidos en este filtro" : "Cocina al día"}</h2><p>${activeItems.length ? "Elegí otro tiempo para ver las comandas." : "Los pedidos enviados por los mozos van a aparecer acá."}</p></div></section>`}</div>`;
 }
 
 function renderMenu() {
@@ -288,7 +291,15 @@ document.querySelector(".main-nav").addEventListener("click", (event) => {
   if (button) setView(button.dataset.view);
 });
 
+appRoot.addEventListener("change", async (event) => {
+  const statusSelect = event.target.closest("select[data-action=\"item-status-select\"]");
+  if (!statusSelect) return;
+  await sendAction({ type: "item_status", table_id: statusSelect.dataset.tableId, item_id: statusSelect.dataset.itemId, status: statusSelect.value });
+});
+
 appRoot.addEventListener("click", async (event) => {
+  const filterButton = event.target.closest("[data-kitchen-filter]");
+  if (filterButton) { kitchenTimingFilter = filterButton.dataset.kitchenFilter; render(); return; }
   const goButton = event.target.closest("[data-go]");
   if (goButton) { setView(goButton.dataset.go); return; }
   const categoryButton = event.target.closest("[data-category]");
