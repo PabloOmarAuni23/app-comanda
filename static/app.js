@@ -172,6 +172,13 @@ function kitchenTiming(timestamp) {
   return { minutes, className: "ticket-cancel-risk", label: "Riesgo de cancelación · más de 35 min" };
 }
 
+function kitchenSentTime(timestamp) {
+  const sentAt = Date.parse(timestamp || "");
+  return Number.isFinite(sentAt)
+    ? new Intl.DateTimeFormat("es-AR", { hour: "2-digit", minute: "2-digit" }).format(new Date(sentAt))
+    : "--:--";
+}
+
 function renderKitchen() {
   const tickets = state.tables.filter((table) => table.status === "open" && table.items.some((item) => ["sent", "preparing", "suspended"].includes(item.status)));
   tickets.sort((left, right) => {
@@ -184,21 +191,23 @@ function renderKitchen() {
   });
   const count = tickets.reduce((sum, table) => sum + table.items.filter((item) => ["sent", "preparing", "suspended"].includes(item.status)).length, 0);
   const cards = tickets.map((table) => {
-      const items = table.items.filter((item) => ["sent", "preparing", "suspended"].includes(item.status)).sort((left, right) => Number(Boolean(right.priority)) - Number(Boolean(left.priority)) || (Date.parse(left.sent_at || "") || 0) - (Date.parse(right.sent_at || "") || 0));
+    const items = table.items.filter((item) => ["sent", "preparing", "suspended"].includes(item.status)).sort((left, right) => Number(Boolean(right.priority)) - Number(Boolean(left.priority)) || (Date.parse(left.sent_at || "") || 0) - (Date.parse(right.sent_at || "") || 0));
+    const oldestItem = items.reduce((oldest, item) => (Date.parse(item.sent_at || "") || 0) < (Date.parse(oldest.sent_at || "") || 0) ? item : oldest);
+    const timing = kitchenTiming(oldestItem.sent_at);
     const renderedItems = items.map((item) => {
-      const timing = kitchenTiming(item.sent_at);
       const priorityBadge = item.priority ? `<span class="priority-badge">Prioridad</span>` : "";
       const actionButtons = item.status === "sent"
         ? `<button class="button button-primary button-small" data-action="item-status" data-table-id="${escapeHtml(table.id)}" data-item-id="${escapeHtml(item.id)}" data-status="preparing">Empezar</button>`
         : "";
       const otherButtons = `<button class="button button-secondary button-small" data-action="item-status" data-table-id="${escapeHtml(table.id)}" data-item-id="${escapeHtml(item.id)}" data-status="ready">Listo</button><button class="button button-secondary button-small" data-action="item-status" data-table-id="${escapeHtml(table.id)}" data-item-id="${escapeHtml(item.id)}" data-status="${item.status === "suspended" ? "preparing" : "suspended"}">${item.status === "suspended" ? "Reanudar" : "Suspender"}</button>`;
       const priorityToggle = `<label class="priority-toggle"><input type="checkbox" data-action="item-priority" data-table-id="${escapeHtml(table.id)}" data-item-id="${escapeHtml(item.id)}" ${item.priority ? "checked" : ""}><span>Prioridad</span></label>`;
-      return `<article class="ticket-item ${timing.className} ${item.priority ? "ticket-priority" : ""}"><div class="ticket-item-head"><strong>${item.quantity} × ${escapeHtml(item.name)}</strong><span>${priorityBadge}${statusLabel(item.status)}</span>${priorityToggle}</div><div class="kitchen-timer" role="timer" aria-label="Pedido hace ${timing.minutes} minutos: ${timing.label}"><strong>${timing.minutes} min</strong><span>${timing.label}</span></div>${item.note ? `<p class="ticket-note">Nota: ${escapeHtml(item.note)}</p>` : ""}<div class="ticket-actions">${actionButtons}${otherButtons}</div></article>`;
+      const kitchenStatus = item.status === "sent" ? "Pendiente" : statusLabel(item.status);
+      return `<article class="ticket-item ${item.priority ? "ticket-priority" : ""}"><div class="ticket-product"><span class="ticket-item-quantity">${item.quantity}</span><div><strong>${escapeHtml(item.name)}</strong>${item.note ? `<p class="ticket-note">${escapeHtml(item.note)}</p>` : ""}</div></div><div class="ticket-item-controls"><span class="status ${item.status}">${priorityBadge}${kitchenStatus}</span><div class="ticket-actions">${actionButtons}${otherButtons}</div></div><div class="ticket-item-priority">${priorityToggle}</div></article>`;
     }).join("");
-    return `<section class="kitchen-ticket"><header class="ticket-head"><div><h2>${escapeHtml(table.name)}</h2><p>Abierta por ${escapeHtml(table.opened_by)}</p></div><span class="status open">${items.length} ${items.length === 1 ? "producto" : "productos"}</span></header><div class="ticket-items">${renderedItems}</div></section>`;
+    return `<section class="kitchen-ticket"><header class="ticket-head ${timing.className}"><div class="ticket-heading-main"><div class="ticket-heading-top"><span class="ticket-sent-time">${kitchenSentTime(oldestItem.sent_at)}</span><span class="kitchen-timer" role="timer" aria-label="Pedido hace ${timing.minutes} minutos: ${timing.label}"><strong>${timing.minutes} min</strong><span>${timing.label}</span></span></div><h2>${escapeHtml(table.name)}</h2><p>Principal · Atiende ${escapeHtml(table.opened_by)}</p></div><span class="status open">${items.length} ${items.length === 1 ? "producto" : "productos"}</span></header><div class="ticket-items">${renderedItems}</div><footer class="ticket-footer"><span class="ticket-footer-meta">${items.length} productos pendientes</span><button class="button button-finish-all" data-action="finish-ticket" data-table-id="${escapeHtml(table.id)}">Terminar todo</button></footer></section>`;
   }).join("");
   const readyCount = state.tables.reduce((sum, table) => sum + table.items.filter((item) => item.status === "ready").length, 0);
-    appRoot.innerHTML = `${pageHeading("Producción", "Cocina", `${count} productos activos · el tiempo cuenta desde que se envió el pedido.`)}<div class="kitchen-legend" aria-label="Tiempos de cocina"><span class="legend-on-time">A tiempo · hasta 15 min</span><span class="legend-delayed">Con retraso · más de 15 y hasta 25 min</span><span class="legend-very-late">Muy retrasado · más de 25 y hasta 35 min</span><span class="legend-cancel-risk">Riesgo de cancelación · más de 35 min</span></div><div class="section-title"><h2>En preparación</h2><span class="status ready">${readyCount} listos para retirar</span></div>${tickets.length ? `<div class="kitchen-grid">${cards}</div>` : `<section class="section-panel"><div class="empty-state"><div class="empty-mark">♨</div><h2>Cocina al día</h2><p>Los pedidos enviados por los mozos van a aparecer acá.</p></div></section>`}`;
+  appRoot.innerHTML = `${pageHeading("Producción", "Cocina", `${count} productos activos · el tiempo cuenta desde que se envió el pedido.`)}<div class="kitchen-legend" aria-label="Tiempos de cocina"><span class="legend-on-time">A tiempo · hasta 15 min</span><span class="legend-delayed">Con retraso · más de 15 y hasta 25 min</span><span class="legend-very-late">Muy retrasado · más de 25 y hasta 35 min</span><span class="legend-cancel-risk">Riesgo de cancelación · más de 35 min</span></div><div class="section-title"><h2>En preparación</h2><span class="status ready">${readyCount} listos para retirar</span></div>${tickets.length ? `<div class="kitchen-grid">${cards}</div>` : `<section class="section-panel"><div class="empty-state"><div class="empty-mark">♨</div><h2>Cocina al día</h2><p>Los pedidos enviados por los mozos van a aparecer acá.</p></div></section>`}`;
 }
 
 function renderMenu() {
@@ -337,6 +346,14 @@ appRoot.addEventListener("click", async (event) => {
   }
   if (actionButton.dataset.action === "item-status") {
     await sendAction({ type: "item_status", table_id: tableId, item_id: actionButton.dataset.itemId, status: actionButton.dataset.status });
+  }
+  if (actionButton.dataset.action === "finish-ticket") {
+    const table = state.tables.find((entry) => entry.id === tableId);
+    const pendingItems = table?.items.filter((item) => ["sent", "preparing", "suspended"].includes(item.status)) || [];
+    for (const item of pendingItems) {
+      const completed = await sendAction({ type: "item_status", table_id: tableId, item_id: item.id, status: "ready" });
+      if (!completed) break;
+    }
   }
 });
 
