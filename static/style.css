@@ -272,3 +272,21 @@ h1, h2, h3 { font-family: 'Manrope', 'Avenir Next', sans-serif; }
   .waiter-field input { width: 76px; }
   .page-heading .button { padding: 0 10px; font-size: 11px; }
                         }
+
+.sales-summary, .sales-history { margin-top: 18px; }
+.sales-summary .section-title { align-items: flex-start; }
+.sales-summary .section-title h2, .sales-history .section-title h2 { margin: 0; font-size: 16px; }
+.sales-summary .section-title p { margin: 5px 0 0; }
+.sales-list { display: grid; gap: 1px; border-top: 1px solid var(--line); }
+.sales-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 11px 4px; border-bottom: 1px solid var(--line); font-size: 13px; }
+.sales-row strong { min-width: 36px; color: var(--green); text-align: right; font: 800 15px 'Manrope', sans-serif; }
+.sales-close-actions { display: flex; flex-wrap: wrap; gap: 9px; margin-top: 18px; }
+.sales-close-actions .button:disabled { opacity: .48; cursor: not-allowed; transform: none; }
+.sales-history { display: grid; gap: 12px; }
+.sales-history .section-title { margin-bottom: 0; }
+.sales-closure { display: grid; gap: 8px; padding: 12px 0; border-top: 1px solid var(--line); }
+.sales-closure-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; font-size: 12px; }
+.sales-closure-head span, .sales-closure-items { color: var(--muted); font-size: 11px; }
+.sales-closure-items { display: flex; flex-wrap: wrap; gap: 5px 12px; }
+.sales-closure-total { color: var(--green); font-size: 12px; }
+@media (max-width: 540px) { .sales-close-actions { display: grid; } .sales-close-actions .button { width: 100%; } }
