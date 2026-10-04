@@ -102,6 +102,7 @@ function render() {
   if (activeView === "tables") renderTables();
   if (activeView === "table-detail") renderTableDetail();
   if (activeView === "kitchen") renderKitchen();
+  if (activeView === "statistics") renderStatistics();
   if (activeView === "menu") renderMenu();
 }
 
@@ -114,7 +115,7 @@ function renderHome() {
   const liveOrders = state.tables.filter((table) => table.status === "open" && table.items.length).slice(0, 4);
   const activity = liveOrders.length ? liveOrders.map((table) => `<button class="order-row" data-table="${escapeHtml(table.id)}"><span><span class="order-name">${escapeHtml(table.name)}</span><br><span class="order-meta">${table.items.length} ${table.items.length === 1 ? "producto" : "productos"} · ${escapeHtml(table.opened_by)}</span></span><span class="status open">${table.items.some((item) => item.status === "draft") ? "Sin enviar" : "En curso"}</span><span class="order-price">${money(tableTotal(table))}</span></button>`).join("") : `<div class="activity-empty"><div class="empty-mark">⌂</div>Las mesas abiertas van a aparecer acá.</div>`;
 
-  appRoot.innerHTML = `${pageHeading("Resumen del turno", "Comanda del bar", "Mesas, pedidos y cocina se actualizan entre todos los dispositivos.")}
+  appRoot.innerHTML = `${pageHeading("Resumen del turno", "Comanda del bar", "Mesas, pedidos y cocina se actualizan entre todos los dispositivos.", `<button class="button button-secondary" data-go="statistics">Estadística</button>`)}
     <section class="stats" aria-label="Resumen de mesas y pedidos">
       <div class="stat"><div class="stat-label">Mesas libres</div><div class="stat-value">${free}</div></div>
       <div class="stat"><div class="stat-label">Abiertas</div><div class="stat-value">${open}</div></div>
@@ -125,6 +126,25 @@ function renderHome() {
       <section class="section-panel"><div class="section-title"><h2>Mesas</h2><button class="text-button" data-go="tables">Ver todas →</button></div><div class="overview-tables">${tables || ""}</div></section>
       <section class="section-panel"><div class="section-title"><h2>Pedidos activos</h2><button class="text-button" data-go="kitchen">Abrir cocina →</button></div><div class="order-list">${activity}</div></section>
     </div>`;
+}
+
+function renderStatistics() {
+  const pendingSales = Array.isArray(state.pending_sales) ? state.pending_sales : [];
+  const closures = Array.isArray(state.sales_closures) ? state.sales_closures : [];
+  const totalUnits = pendingSales.reduce((sum, item) => sum + Number(item.quantity || 0), 0);
+  const saleRows = pendingSales.length
+    ? pendingSales.map((item) => `<div class="sales-row"><span>${escapeHtml(item.name)}</span><strong>${Number(item.quantity) || 0}</strong></div>`).join("")
+    : `<div class="empty-state">Todavía no hay ventas pendientes de cierre.</div>`;
+  const history = closures.slice(-6).reverse().map((closure) => {
+    const shiftLabel = closure.shift === "morning" ? "Mañana" : "Tarde";
+    const closedDate = new Date(closure.closed_at).toLocaleString("es-AR", { dateStyle: "short", timeStyle: "short" });
+    const items = closure.items.map((item) => `<span>${escapeHtml(item.name)} × ${Number(item.quantity) || 0}</span>`).join("");
+    return `<article class="sales-closure"><div class="sales-closure-head"><strong>Turno ${shiftLabel}</strong><span>${closedDate}</span></div><div class="sales-closure-items">${items}</div><strong class="sales-closure-total">${Number(closure.total_units) || 0} unidades</strong></article>`;
+  }).join("");
+  const closeDisabled = pendingSales.length ? "" : "disabled";
+  appRoot.innerHTML = `${pageHeading("Ventas", "Estadística", "Unidades de productos cobrados desde el último cierre de turno.", `<button class="button button-secondary" data-go="home">← Inicio</button>`)}
+    <section class="section-panel sales-summary"><div class="section-title"><div><h2>Pendiente de cierre</h2><p class="order-meta">${pendingSales.length} productos · ${totalUnits} unidades</p></div></div><div class="sales-list">${saleRows}</div><div class="sales-close-actions"><button class="button button-primary" data-action="sales-close" data-shift="morning" ${closeDisabled}>Cerrar turno mañana y enviar por WhatsApp</button><button class="button button-primary" data-action="sales-close" data-shift="afternoon" ${closeDisabled}>Cerrar turno tarde y enviar por WhatsApp</button></div></section>
+    <section class="section-panel sales-history"><div class="section-title"><h2>Últimos cierres</h2></div>${history || `<p class="order-meta">Todavía no hay cierres guardados.</p>`}</section>`;
 }
 
 function renderTables() {
@@ -357,6 +377,20 @@ appRoot.addEventListener("click", async (event) => {
   }
   if (actionButton.dataset.action === "item-status") {
     await sendAction({ type: "item_status", table_id: tableId, item_id: actionButton.dataset.itemId, status: actionButton.dataset.status });
+  }
+  if (actionButton.dataset.action === "sales-close") {
+    const shift = actionButton.dataset.shift;
+    const shiftLabel = shift === "morning" ? "mañana" : "tarde";
+    if (!window.confirm(`¿Cerrar el turno ${shiftLabel}? Las ventas actuales quedarán separadas para el siguiente turno.`)) return;
+    const whatsappWindow = window.open("about:blank", "_blank");
+    const closed = await sendAction({ type: "sales_close", shift }, `Cierre del turno ${shiftLabel} guardado.`);
+    if (!closed) { whatsappWindow?.close(); return; }
+    const closure = state.sales_closures[state.sales_closures.length - 1];
+    const lines = closure.items.map((item) => `• ${item.name}: ${item.quantity}`);
+    const message = [`CIERRE TURNO ${shiftLabel.toUpperCase()}`, `Fecha: ${new Date(closure.closed_at).toLocaleString("es-AR")}`, "", "Productos vendidos:", ...lines, "", `Total de unidades: ${closure.total_units}`].join("\n");
+    const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(message)}`;
+    if (whatsappWindow) whatsappWindow.location.href = whatsappUrl;
+    else showToast("El cierre quedó guardado, pero el navegador bloqueó la ventana de WhatsApp.", true);
   }
   if (actionButton.dataset.action === "finish-ticket") {
     const table = state.tables.find((entry) => entry.id === tableId);
