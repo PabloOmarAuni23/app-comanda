@@ -27,7 +27,7 @@ La base local se crea en `instance/comanda.sqlite3`. Para probar desde otro tel�
 
 Todos los teléfonos que abran la misma URL comparten el estado actual en el servidor. El plan gratuito duerme después de 15 minutos sin visitas y puede reiniciarse; al dormir, reiniciar o volver a desplegarse, Render borra los archivos locales. Por eso las mesas abiertas y los cambios manuales de la carta pueden perderse antes de limpiar la mesa. Al volver, el servidor carga la carta inicial y todas las mesas libres. La primera visita tras dormir puede tardar alrededor de un minuto.
 
-Este modo evita el costo del disco persistente y no guarda historial, pero no garantiza conservar una comanda abierta si nadie tiene la app activa o si Render reinicia el servicio. Para garantizar esa persistencia haría falta una base alojada aparte; no se configura aquí para mantener el costo en cero.
+Este modo evita el costo del disco persistente. Los cierres por turno guardan las unidades vendidas y permiten compartir el resumen por WhatsApp, pero tanto las ventas pendientes como el historial de cierres se guardan en el archivo local y pueden perderse si Render duerme, reinicia o vuelve a desplegarse. Para garantizar esa persistencia haría falta una base alojada aparte; no se configura aquí para mantener el costo en cero. Para garantizar esa persistencia haría falta una base alojada aparte; no se configura aquí para mantener el costo en cero.
 
 ### Instalar y ubicar el icono
 
