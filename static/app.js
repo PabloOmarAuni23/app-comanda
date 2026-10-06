@@ -6,6 +6,7 @@ const dialogActions = document.querySelector("#dialogActions");
 const toastElement = document.querySelector("#toast");
 const syncElement = document.querySelector("#syncState");
 const waiterInput = document.querySelector("#waiterName");
+const readyNoticeElement = document.querySelector("#readyNotice");
 
 let state = null;
 let activeView = "home";
@@ -32,6 +33,14 @@ function money(value) {
 
 function tableTotal(table) {
   return table.items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+}
+
+function itemModifierSummary(item) {
+  return (item.modifiers || []).map((modifier) => {
+    const quantity = modifier.quantity * item.quantity;
+    const option = quantity > 1 ? `${quantity} × ${escapeHtml(modifier.name)}` : escapeHtml(modifier.name);
+    return `${escapeHtml(modifier.group)}: ${option}`;
+  }).join(" · ");
 }
 
 function statusLabel(status) {
@@ -95,8 +104,34 @@ function pageHeading(eyebrow, title, subtitle, button = "") {
   return `<div class="page-heading"><div><p class="eyebrow">${escapeHtml(eyebrow)}</p><h1>${escapeHtml(title)}</h1><p>${escapeHtml(subtitle)}</p></div>${button}</div>`;
 }
 
+function renderReadyNotice() {
+  const readyTables = state.tables
+    .filter((table) => table.status === "open")
+    .map((table) => ({ ...table, readyItems: table.items.filter((item) => item.status === "ready") }))
+    .filter((table) => table.readyItems.length);
+  const readyItems = readyTables.flatMap((table) => table.readyItems.map((item) => ({ table, item })));
+
+  readyNoticeElement.hidden = readyItems.length === 0;
+  if (!readyItems.length) {
+    readyNoticeElement.innerHTML = "";
+    return;
+  }
+
+  const previewItems = readyItems.slice(0, 3);
+  const preview = previewItems.map(({ table, item }) => `${escapeHtml(table.name)} · ${item.quantity} × ${escapeHtml(item.name)}`).join(" &nbsp; | &nbsp; ");
+  const remaining = readyItems.length - previewItems.length;
+  const readyTableCount = readyTables.length;
+  const summary = `${readyTableCount} ${readyTableCount === 1 ? "mesa" : "mesas"} · ${readyItems.length} ${readyItems.length === 1 ? "producto listo" : "productos listos"} para retirar`;
+  const targetTable = readyTables[0];
+
+  readyNoticeElement.dataset.tableId = targetTable.id;
+  readyNoticeElement.setAttribute("aria-label", `${summary}. Ir a ${targetTable.name} para retirar el pedido.`);
+  readyNoticeElement.innerHTML = `<span class="ready-notice-icon" aria-hidden="true">!</span><span class="ready-notice-copy"><strong>¡Hay pedidos listos para retirar!</strong><span>${summary}</span><span class="ready-notice-items">${preview}${remaining ? ` &nbsp; | &nbsp; y ${remaining} más` : ""}</span></span><span class="ready-notice-action">Ir a buscar →</span>`;
+}
+
 function render() {
   if (!state) return;
+  renderReadyNotice();
   document.querySelectorAll(".nav-button").forEach((button) => button.classList.toggle("active", button.dataset.view === activeView));
   if (activeView === "home") renderHome();
   if (activeView === "tables") renderTables();
@@ -171,7 +206,7 @@ function renderTableDetail() {
   const dishes = state.menu.filter((dish) => dish.available && (activeCategory === "Todas" || dish.category === activeCategory));
   const categoryButtons = categories.map((category) => `<button class="category-button ${category === activeCategory ? "active" : ""}" data-category="${escapeHtml(category)}">${escapeHtml(category)}</button>`).join("");
   const products = dishes.map((dish) => `<button class="product-button" data-add-product="${escapeHtml(dish.id)}"><strong>${escapeHtml(dish.name)}</strong><span>${escapeHtml(dish.description || dish.category)}</span><b>${money(dish.price)}</b></button>`).join("");
-  const orderRows = table.items.length ? table.items.map((item) => `<div class="order-row"><div><div class="order-name">${item.quantity} × ${escapeHtml(item.name)}</div>${item.note ? `<div class="order-note">${escapeHtml(item.note)}</div>` : ""}<div class="order-meta">${item.status === "draft" ? `Agregado por ${escapeHtml(item.added_by)}` : `Tomado por ${escapeHtml(item.added_by)}`}</div></div><span class="status ${item.status}">${statusLabel(item.status)}</span><span class="order-price">${money(item.price * item.quantity)}</span></div>`).join("") : `<div class="empty-state"><div class="empty-mark">＋</div><h2>La mesa está abierta</h2><p>Agregá productos de la carta para empezar.</p></div>`;
+  const orderRows = table.items.length ? table.items.map((item) => `<div class="order-row ${item.status === "ready" ? "ready-order" : ""}"><div><div class="order-name">${item.quantity} × ${escapeHtml(item.name)}</div>${itemModifierSummary(item) ? `<div class="order-note">${itemModifierSummary(item)}</div>` : ""}${item.note ? `<div class="order-note">${escapeHtml(item.note)}</div>` : ""}<div class="order-meta">${item.status === "draft" ? `Agregado por ${escapeHtml(item.added_by)}` : `Tomado por ${escapeHtml(item.added_by)}`}</div></div><span class="status ${item.status}">${item.status === "ready" ? "Listo para retirar" : statusLabel(item.status)}</span><span class="order-price">${money(item.price * item.quantity)}</span></div>`).join("") : `<div class="empty-state"><div class="empty-mark">＋</div><h2>La mesa está abierta</h2><p>Agregá productos de la carta para empezar.</p></div>`;
   const hasDraft = table.items.some((item) => item.status === "draft");
   const sendButton = hasDraft ? `<button class="button button-primary" data-action="send-order" data-table-id="${escapeHtml(table.id)}">Enviar a cocina</button>` : "";
   const canPay = table.items.length > 0 && !hasDraft && table.items.every((item) => item.status === "ready");
@@ -278,25 +313,213 @@ function showOpenTableDialog(table) {
   } });
 }
 
+function readModifierGroups() {
+  const entries = [...dialogBody.querySelectorAll("[data-modifier-group]")].map((group) => ({
+    name: group.querySelector("[data-group-name]").value.trim(),
+    selection: group.querySelector("[data-group-selection]").value,
+    required: group.querySelector("[data-group-required]").checked,
+    showGroupIndex: group.querySelector("[data-group-show-group]")?.value ?? "",
+    showOptionIndexes: [...group.querySelectorAll("[data-group-show-option]:checked")].map((checkbox) => Number(checkbox.value)),
+    options: [...group.querySelectorAll("[data-modifier-option]")].map((option) => ({
+      name: option.querySelector("[data-option-name]").value.trim(),
+      price: option.querySelector("[data-option-price]").value,
+    })),
+  }));
+  return entries.map((entry) => {
+    const group = { name: entry.name, selection: entry.selection, required: entry.required, options: entry.options };
+    const dependency = entry.showGroupIndex === "" ? null : entries[Number(entry.showGroupIndex)];
+    if (dependency && dependency.name && dependency.name !== entry.name) {
+      const conditionOptions = entry.showOptionIndexes.map((index) => dependency.options[index]?.name).filter((name) => name);
+      group.show_when = { group: dependency.name };
+      if (conditionOptions.length) group.show_when.options = conditionOptions;
+    }
+    return group;
+  });
+}
+
+function modifierGroupEditor(groups) {
+  const groupRows = groups.map((group, groupIndex) => {
+    const condition = group.show_when || null;
+    const conditionIndex = condition ? groups.findIndex((entry) => entry.name === condition.group) : -1;
+    const dependencyOptions = groups.map((entry, entryIndex) => entryIndex === groupIndex ? "" : `<option value="${entryIndex}" ${entryIndex === conditionIndex ? "selected" : ""}>${escapeHtml(entry.name || `Grupo ${entryIndex + 1}`)}</option>`).filter(Boolean).join("");
+    let conditionFields = `<label class="dialog-field">Mostrar cuando<select data-group-show-group><option value="">Siempre visible</option>${dependencyOptions}</select></label>`;
+    if (conditionIndex >= 0) {
+      const dependency = groups[conditionIndex];
+      const checkedOptions = new Set(condition.options || []);
+      const optionChecks = dependency.options.map((option, optionIndex) => `<label class="modifier-condition-option"><input type="checkbox" data-group-show-option value="${optionIndex}" ${checkedOptions.has(option.name) ? "checked" : ""}><span>${escapeHtml(option.name || `Opción ${optionIndex + 1}`)}</span></label>`).join("");
+      conditionFields += `<div class="modifier-condition-options"><p class="modifier-help">Se abre solo al marcar una de estas opciones de ${escapeHtml(dependency.name)}. Sin marcar ninguna, se abre con cualquier opción.</p>${optionChecks || `<p class="modifier-help">Este grupo todavía no tiene opciones.</p>`}</div>`;
+    }
+    return `<section class="modifier-group-editor" data-modifier-group>
+    <div class="modifier-group-heading"><strong>Grupo de opciones</strong><button class="text-button" type="button" data-group-action="remove-group">Quitar grupo</button></div>
+    <label class="dialog-field">Nombre del grupo<input data-group-name maxlength="60" value="${escapeHtml(group.name)}" placeholder="Ej.: Infusión" required></label>
+    <label class="dialog-field">Cómo se elige<select data-group-selection><option value="single" ${group.selection === "single" ? "selected" : ""}>Una opción</option><option value="quantity" ${group.selection === "quantity" ? "selected" : ""}>Cantidades por opción</option></select></label>
+    ${conditionFields}
+    <label class="modifier-required"><input type="checkbox" data-group-required ${group.required ? "checked" : ""}><span>Obligatorio</span></label>
+    <div class="modifier-options">${group.options.map((option) => `<div class="modifier-option" data-modifier-option><label class="dialog-field">Opción<input data-option-name maxlength="60" value="${escapeHtml(option.name)}" placeholder="Ej.: Mate cocido" required></label><label class="dialog-field modifier-price">Adicional<input data-option-price type="number" min="0" step="1" value="${escapeHtml(option.price ?? 0)}" required></label><button class="icon-button" type="button" data-group-action="remove-option" aria-label="Quitar opción">×</button></div>`).join("")}</div>
+    <button class="text-button" type="button" data-group-action="add-option">＋ Agregar opción</button>
+  </section>`;
+  }).join("");
+  return `<div class="modifier-editor"><h3>Opciones para el pedido</h3><p class="modifier-help">Se muestran al elegir este producto. Usá un adicional de $0 para opciones incluidas; solo los agregados con recargo aumentan el precio. Con «Mostrar cuando» el grupo se abre recién al marcar la opción que lo activa, por ejemplo los acompañamientos al elegir la infusión.</p>${groupRows || `<p class="modifier-empty">Sin opciones configuradas.</p>`}<button class="button button-secondary" type="button" data-group-action="add-group">＋ Agregar grupo</button></div>`;
+}
+
 function showProductDialog(dish = null) {
   const editing = Boolean(dish);
   const categories = [...new Set(state.menu.map((entry) => entry.category))];
   const categoryOptions = [...new Set([...categories, "Infusiones", "Para acompañar", "Bebidas"])].map((category) => `<option value="${escapeHtml(category)}" ${dish?.category === category ? "selected" : ""}>${escapeHtml(category)}</option>`).join("");
-  const body = `<label class="dialog-field">Nombre del producto<input name="name" maxlength="80" value="${escapeHtml(dish?.name || "")}" required></label><label class="dialog-field">Categoría<select name="category" required>${categoryOptions}<option value="__custom">Otra categoría…</option></select></label><label class="dialog-field custom-category" hidden>Nueva categoría<input name="custom_category" maxlength="40"></label><label class="dialog-field">Descripción<textarea name="description" maxlength="120" placeholder="Detalle opcional">${escapeHtml(dish?.description || "")}</textarea></label><label class="dialog-field">Precio en pesos<input name="price" type="number" min="0" step="1" value="${escapeHtml(dish?.price ?? "")}" required></label>${editing ? `<label class="dialog-field">Disponibilidad<select name="available"><option value="true" ${dish.available ? "selected" : ""}>Disponible</option><option value="false" ${!dish.available ? "selected" : ""}>Pausado</option></select></label>` : ""}`;
+  const groups = dish?.modifier_groups || [];
+  const body = `<label class="dialog-field">Nombre del producto<input name="name" maxlength="80" value="${escapeHtml(dish?.name || "")}" required></label><label class="dialog-field">Categoría<select name="category" required>${categoryOptions}<option value="__custom">Otra categoría…</option></select></label><label class="dialog-field custom-category" hidden>Nueva categoría<input name="custom_category" maxlength="40"></label><label class="dialog-field">Descripción<textarea name="description" maxlength="120" placeholder="Detalle opcional">${escapeHtml(dish?.description || "")}</textarea></label><label class="dialog-field">Precio en pesos<input name="price" type="number" min="0" step="1" value="${escapeHtml(dish?.price ?? "")}" required></label>${editing ? `<label class="dialog-field">Disponibilidad<select name="available"><option value="true" ${dish.available ? "selected" : ""}>Disponible</option><option value="false" ${!dish.available ? "selected" : ""}>Pausado</option></select></label>` : ""}${modifierGroupEditor(groups)}`;
   showDialog({ eyebrow: editing ? "Editar carta" : "Carta del bar", title: editing ? "Editar producto" : "Nuevo producto", body, submitLabel: editing ? "Guardar cambios" : "Agregar producto", onSubmit: (data) => {
     const category = data.category === "__custom" ? data.custom_category : data.category;
-    const action = { type: editing ? "menu_update" : "menu_add", menu_id: dish?.id, name: data.name, category, description: data.description, price: data.price, available: data.available !== "false" };
+    const action = { type: editing ? "menu_update" : "menu_add", menu_id: dish?.id, name: data.name, category, description: data.description, price: data.price, available: data.available !== "false", modifier_groups: readModifierGroups() };
     return sendAction(action, editing ? "Producto actualizado." : "Producto agregado.");
   } });
+  dialogBody.onclick = (event) => {
+    const button = event.target.closest("[data-group-action]");
+    if (!button) return;
+    const updatedGroups = readModifierGroups();
+    const group = button.closest("[data-modifier-group]");
+    const groupIndex = [...dialogBody.querySelectorAll("[data-modifier-group]")].indexOf(group);
+    const optionIndex = group ? [...group.querySelectorAll("[data-modifier-option]")].indexOf(button.closest("[data-modifier-option]")) : -1;
+    if (button.dataset.groupAction === "add-group") updatedGroups.push({ name: "", selection: "quantity", required: false, options: [{ name: "", price: 0 }] });
+    if (button.dataset.groupAction === "remove-group") updatedGroups.splice(groupIndex, 1);
+    if (button.dataset.groupAction === "add-option") updatedGroups[groupIndex].options.push({ name: "", price: 0 });
+    if (button.dataset.groupAction === "remove-option") updatedGroups[groupIndex].options.splice(optionIndex, 1);
+    dialogBody.querySelector(".modifier-editor").outerHTML = modifierGroupEditor(updatedGroups);
+  };
+  dialogBody.onchange = (event) => {
+    if (event.target.matches("[data-group-show-group]")) {
+      const section = event.target.closest("[data-modifier-group]");
+      section?.querySelectorAll("[data-group-show-option]").forEach((checkbox) => { checkbox.checked = false; });
+      const updatedGroups = readModifierGroups();
+      dialogBody.querySelector(".modifier-editor").outerHTML = modifierGroupEditor(updatedGroups);
+      return;
+    }
+    if (event.target.matches("[data-group-name]")) {
+      const groupIndex = [...dialogBody.querySelectorAll("[data-modifier-group]")].indexOf(event.target.closest("[data-modifier-group]"));
+      const name = event.target.value.trim() || `Grupo ${groupIndex + 1}`;
+      dialogBody.querySelectorAll(`[data-group-show-group] option[value="${groupIndex}"]`).forEach((option) => { option.textContent = name; });
+      return;
+    }
+    if (event.target.matches("[data-option-name]")) {
+      const section = event.target.closest("[data-modifier-group]");
+      if (!section) return;
+      const groupIndex = [...dialogBody.querySelectorAll("[data-modifier-group]")].indexOf(section);
+      const optionIndex = [...section.querySelectorAll("[data-modifier-option]")].indexOf(event.target.closest("[data-modifier-option]"));
+      const name = event.target.value.trim() || `Opción ${optionIndex + 1}`;
+      dialogBody.querySelectorAll("[data-modifier-group]").forEach((otherSection, otherIndex) => {
+        if (otherIndex === groupIndex) return;
+        const dependencySelect = otherSection.querySelector("[data-group-show-group]");
+        if (dependencySelect?.value !== String(groupIndex)) return;
+        const checkbox = otherSection.querySelector(`[data-group-show-option][value="${optionIndex}"]`);
+        if (checkbox?.nextElementSibling) checkbox.nextElementSibling.textContent = name;
+      });
+    }
+  };
   dialogBody.querySelector('select[name="category"]')?.addEventListener("change", (event) => {
     dialogBody.querySelector(".custom-category").hidden = event.target.value !== "__custom";
-    if (event.target.value === "__custom") dialogBody.querySelector('input[name="custom_category"]').required = true;
+    dialogBody.querySelector('input[name="custom_category"]').required = event.target.value === "__custom";
   });
 }
 
 function showAddItemDialog(table, dish) {
-  const body = `<div class="dialog-product-line"><strong>${escapeHtml(dish.name)}</strong><span>${money(dish.price)}</span></div><label class="dialog-field">Cantidad<div class="quantity-stepper"><button class="quantity-step" type="button" data-quantity-step="-1" aria-label="Disminuir cantidad">−</button><input name="quantity" type="number" min="1" max="99" value="1" inputmode="none" readonly aria-live="polite" required><button class="quantity-step" type="button" data-quantity-step="1" aria-label="Aumentar cantidad">+</button></div></label><label class="priority-field"><input name="priority" type="checkbox"><span>Prioridad</span><small>Producto rápido de preparar</small></label><label class="dialog-field">Nota para cocina<textarea name="note" maxlength="160" placeholder="Ej.: sin azúcar, bien tostado"></textarea></label>`;
-  showDialog({ eyebrow: table.name, title: "Agregar al pedido", body, submitLabel: "Agregar", onSubmit: (data) => sendAction({ type: "item_add", table_id: table.id, menu_id: dish.id, quantity: data.quantity, note: data.note, priority: data.priority === "on", waiter: waiterInput.value.trim() || table.opened_by }, `${dish.name} agregado.`) });
+  const groups = dish.modifier_groups || [];
+  const modifierFields = groups.map((group, groupIndex) => {
+    const condition = group.show_when || null;
+    const wrapperAttributes = `data-modifier-wrapper data-modifier-group-name="${escapeHtml(group.name)}"${condition ? ` data-conditional-group data-when-group="${escapeHtml(condition.group)}" data-when-options="${escapeHtml(JSON.stringify(condition.options || []))}"` : ""}`;
+    const conditionHint = condition ? `<small class="modifier-condition-hint">Se abre al elegir ${escapeHtml(condition.group)}</small>` : "";
+    const options = group.options.map((option, optionIndex) => {
+      const surcharge = option.price ? ` · +${money(option.price)}` : " · incluido";
+      return group.selection === "single"
+        ? `<option value="${escapeHtml(option.name)}">${escapeHtml(option.name)}${surcharge}</option>`
+        : `<div class="modifier-quantity-row"><span>${escapeHtml(option.name)}${surcharge}</span><div class="quantity-stepper modifier-stepper"><button class="quantity-step" type="button" data-quantity-step="-1" aria-label="Disminuir ${escapeHtml(option.name)}">−</button><input name="modifier-${groupIndex}-${optionIndex}" data-quantity-choice="${escapeHtml(option.name)}" type="number" min="0" max="99" value="0" inputmode="none" readonly aria-label="Cantidad de ${escapeHtml(option.name)}"><button class="quantity-step" type="button" data-quantity-step="1" aria-label="Aumentar ${escapeHtml(option.name)}">+</button></div></div>`;
+    }).join("");
+    return group.selection === "single"
+      ? `<label class="dialog-field modifier-selection" ${wrapperAttributes}>${escapeHtml(group.name)}${group.required ? " · obligatorio" : ""}${conditionHint}<select name="modifier-group-${groupIndex}" data-single-choice ${group.required ? 'data-required="true" required' : ""}><option value="">${group.required ? "Elegí una opción" : "Sin selección"}</option>${options}</select></label>`
+      : `<fieldset class="modifier-selection" ${wrapperAttributes}><legend>${escapeHtml(group.name)}${group.required ? " · elegí al menos una" : ""}</legend>${conditionHint}${options}</fieldset>`;
+  }).join("");
+  const body = `<div class="dialog-product-line"><strong>${escapeHtml(dish.name)}</strong><span>${money(dish.price)}</span></div>${modifierFields}<label class="dialog-field">Cantidad del producto<div class="quantity-stepper"><button class="quantity-step" type="button" data-quantity-step="-1" aria-label="Disminuir cantidad">−</button><input name="quantity" type="number" min="1" max="99" value="1" inputmode="none" readonly aria-live="polite" required><button class="quantity-step" type="button" data-quantity-step="1" aria-label="Aumentar cantidad">+</button></div></label><label class="priority-field"><input name="priority" type="checkbox"><span>Prioridad</span><small>Producto rápido de preparar</small></label><label class="dialog-field">Nota para cocina<textarea name="note" maxlength="160" placeholder="Ej.: sin azúcar, bien tostado"></textarea></label>`;
+  showDialog({ eyebrow: table.name, title: "Agregar al pedido", body, submitLabel: "Agregar", onSubmit: (data) => {
+    const wrappers = [...dialogBody.querySelectorAll("[data-modifier-wrapper]")];
+    const modifiers = [];
+    groups.forEach((group, groupIndex) => {
+      if (wrappers[groupIndex]?.hidden) return;
+      if (group.selection === "single") {
+        const option = data[`modifier-group-${groupIndex}`];
+        if (option) modifiers.push({ group: group.name, option, quantity: 1 });
+        return;
+      }
+      let selectedCount = 0;
+      group.options.forEach((option, optionIndex) => {
+        const quantity = Number(data[`modifier-${groupIndex}-${optionIndex}`]) || 0;
+        if (quantity > 0) {
+          selectedCount += quantity;
+          modifiers.push({ group: group.name, option: option.name, quantity });
+        }
+      });
+      if (group.required && selectedCount === 0) {
+        showToast(`Elegí al menos una opción para ${group.name}.`, true);
+        return;
+      }
+    });
+    if (groups.some((group, groupIndex) => !wrappers[groupIndex]?.hidden && group.selection === "quantity" && group.required && !modifiers.some((modifier) => modifier.group === group.name))) return false;
+    return sendAction({ type: "item_add", table_id: table.id, menu_id: dish.id, quantity: data.quantity, modifiers, note: data.note, priority: data.priority === "on", waiter: waiterInput.value.trim() || table.opened_by }, `${dish.name} agregado.`);
+  } });
+  syncConditionalModifierGroups();
+}
+
+function syncConditionalModifierGroups() {
+  const wrappers = [...dialogBody.querySelectorAll("[data-modifier-wrapper]")];
+  if (!wrappers.length) return;
+  const selectedByGroup = new Map();
+  wrappers.forEach((wrapper) => {
+    const chosen = [];
+    const singleChoice = wrapper.querySelector("[data-single-choice]");
+    if (singleChoice && singleChoice.value) chosen.push(singleChoice.value);
+    wrapper.querySelectorAll("[data-quantity-choice]").forEach((input) => {
+      const quantity = Number(input.value) || 0;
+      for (let index = 0; index < quantity; index += 1) chosen.push(input.dataset.quantityChoice);
+    });
+    selectedByGroup.set(wrapper.dataset.modifierGroupName, chosen);
+  });
+  const visibility = new Map();
+  wrappers.forEach((wrapper) => visibility.set(wrapper.dataset.modifierGroupName, !wrapper.hasAttribute("data-conditional-group")));
+  let changed = true;
+  while (changed) {
+    changed = false;
+    wrappers.forEach((wrapper) => {
+      const name = wrapper.dataset.modifierGroupName;
+      if (visibility.get(name)) return;
+      const dependency = wrapper.dataset.whenGroup;
+      if (!visibility.get(dependency)) return;
+      const chosen = selectedByGroup.get(dependency) || [];
+      if (!chosen.length) return;
+      let conditionOptions = [];
+      try { conditionOptions = JSON.parse(wrapper.dataset.whenOptions || "[]"); } catch (error) { conditionOptions = []; }
+      if (!conditionOptions.length || conditionOptions.some((option) => chosen.includes(option))) {
+        visibility.set(name, true);
+        changed = true;
+      }
+    });
+  }
+  wrappers.forEach((wrapper) => {
+    const visible = visibility.get(wrapper.dataset.modifierGroupName);
+    const wasVisible = wrapper.dataset.visible !== "false";
+    const singleChoice = wrapper.querySelector("[data-single-choice]");
+    if (visible) {
+      wrapper.hidden = false;
+      wrapper.dataset.visible = "true";
+      if (wasVisible) return;
+      if (singleChoice) singleChoice.required = singleChoice.dataset.required === "true";
+      return;
+    }
+    wrapper.hidden = true;
+    wrapper.dataset.visible = "false";
+    if (singleChoice) {
+      singleChoice.required = false;
+      singleChoice.value = "";
+    }
+    wrapper.querySelectorAll("[data-quantity-choice]").forEach((input) => { input.value = "0"; });
+  });
 }
 
 function setView(view) {
@@ -406,13 +629,18 @@ document.querySelector("#dialog").addEventListener("click", (event) => {
   if (event.target.closest("[data-close-dialog]")) dialog.close();
   const stepButton = event.target.closest("[data-quantity-step]");
   if (stepButton) {
-    const quantityInput = dialogBody.querySelector('input[name="quantity"]');
+    const quantityInput = stepButton.closest(".quantity-stepper")?.querySelector("input");
     if (!quantityInput) return;
-    const current = Number(quantityInput.value) || 1;
-    const next = Math.max(Number(quantityInput.min), Math.min(Number(quantityInput.max), current + Number(stepButton.dataset.quantityStep)));
+    const minimum = Number(quantityInput.min);
+    const maximum = Number(quantityInput.max);
+    const current = Number(quantityInput.value);
+    const next = Math.max(minimum, Math.min(maximum, (Number.isFinite(current) ? current : minimum) + Number(stepButton.dataset.quantityStep)));
     quantityInput.value = String(next);
+    syncConditionalModifierGroups();
   }
 });
+
+dialogBody.addEventListener("change", () => syncConditionalModifierGroups());
 
 window.addEventListener("beforeinstallprompt", (event) => {
   event.preventDefault();
@@ -428,7 +656,7 @@ document.querySelector("#installButton").addEventListener("click", async () => {
   document.querySelector("#installButton").hidden = true;
 });
 
-if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js?v=9").catch(() => {});
 loadState(true);
 setInterval(() => loadState(), 2200);
 setInterval(() => {

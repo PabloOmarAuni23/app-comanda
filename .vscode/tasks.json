@@ -55,6 +55,18 @@
 			],
 			"isBackground": false,
 			"problemMatcher": []
+		},
+		{
+			"label": "Comanda: preparar aviso listo",
+			"type": "shell",
+			"command": "git",
+			"args": [
+				"add",
+				"static/app.js",
+				"templates/index.html"
+			],
+			"isBackground": false,
+			"problemMatcher": []
 		}
 	]
 }

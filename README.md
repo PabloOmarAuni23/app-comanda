@@ -40,3 +40,11 @@ Este modo evita el costo del disco persistente. Los cierres por turno guardan la
 No hay usuario, clave ni permisos por persona: cualquiera que tenga la URL puede ver y modificar las mesas, los pedidos y la carta. El nombre de atención se guarda solo en el teléfono y se adjunta a los pedidos. No publiques información sensible.
 
 La carta se carga y edita manualmente. El escaneo automático de fotos con IA no está incluido porque necesita un servicio externo.
+
+### Combos y opciones
+
+Al crear o editar un producto desde **Carta**, se pueden agregar grupos de opciones que aparecen únicamente al agregar ese producto al pedido. Cada grupo permite elegir una opción o indicar cantidades independientes, y puede marcarse como obligatorio. Por ejemplo, un combo puede tener un grupo obligatorio **Infusión** (una opción) y un grupo **Acompañamientos** (cantidades para tortillas, bollitos o facturas).
+
+Los precios de las opciones se configuran como recargos por unidad: dejalos en `$0` para las alternativas incluidas en el combo y asigná un importe solo a los agregados, como manteca o mermelada. Las cantidades de opciones corresponden a cada combo; si se agregan varios combos iguales, los acompañamientos y sus recargos se multiplican por esa cantidad. Las selecciones se guardan en el pedido y se muestran también en cocina.
+
+Cada grupo puede marcarse como **condicional** con el campo *Mostrar cuando*: elegí el grupo que lo activa y, opcionalmente, solo algunas de sus opciones. El grupo condicional permanece oculto (y sin exigir sus opciones obligatorias) hasta que se marca la opción que lo activa; en ese momento se abre su lista de cantidades con los botones `−` / `+`. Por ejemplo, el combo **Clásico** muestra los **Acompañamientos** recién al elegir la infusión, y cada acompañamiento se suma con su propia cantidad (dos tortillas gruesas, una fina y una factura, etc.).
