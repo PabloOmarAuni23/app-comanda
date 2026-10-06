@@ -290,7 +290,7 @@ function renderTableDetail() {
   const table = state.tables.find((entry) => entry.id === activeTableId);
   if (!table) { activeView = "tables"; renderTables(); return; }
   if (table.status === "cleaning") {
-    appRoot.innerHTML = `${pageHeading("Mesa cobrada", table.name, "La cuenta está cerrada. Cuando terminen de limpiar, liberá la mesa.", `<div class="page-heading-buttons"><button class="button button-secondary" data-action="download-table-report" data-table-id="${escapeHtml(table.id)}">↓ Descargar detalle</button><button class="button button-primary" data-action="clean-table" data-table-id="${escapeHtml(table.id)}">✓ Mesa limpia</button></div>`)}<section class="section-panel"><div class="empty-state"><div class="empty-mark">✓</div><h2>Cuenta cobrada</h2><p>Esta mesa queda visible para todo el equipo hasta marcarla limpia.</p></div></section>`;
+    appRoot.innerHTML = `${pageHeading("Mesa cobrada", table.name, "La cuenta está cerrada. Cuando terminen de limpiar, liberá la mesa.", `<button class="button button-primary" data-action="clean-table" data-table-id="${escapeHtml(table.id)}">✓ Mesa limpia</button>`)}<section class="section-panel"><div class="empty-state"><div class="empty-mark">✓</div><h2>Cuenta cobrada</h2><p>Esta mesa queda visible para todo el equipo hasta marcarla limpia.</p></div></section>`;
     return;
   }
   if (table.status !== "open") { activeView = "tables"; renderTables(); return; }
@@ -304,11 +304,10 @@ function renderTableDetail() {
   const sendButton = hasDraft ? `<button class="button button-primary" data-action="send-order" data-table-id="${escapeHtml(table.id)}">Enviar a cocina</button>` : "";
   const canPay = table.items.length > 0 && !hasDraft && table.items.every((item) => item.status === "ready");
   const payButton = canPay ? `<button class="button button-secondary" data-action="pay-table" data-table-id="${escapeHtml(table.id)}">Cobrar ${money(tableTotal(table))}</button>` : "";
-  const downloadButton = table.items.length ? `<button class="button button-secondary" data-action="download-table-report" data-table-id="${escapeHtml(table.id)}">↓ Descargar detalle</button>` : "";
   const disabledPayMessage = table.items.length && !canPay ? `<p class="order-meta">${hasDraft ? "Enviá los productos nuevos a cocina para cobrar." : "Podés cobrar cuando todos los productos estén listos."}</p>` : "";
   appRoot.innerHTML = `${pageHeading("Pedido de mesa", table.name, `Abierta por ${escapeHtml(table.opened_by)}${guestsSuffix(table)} · Total ${money(tableTotal(table))}`, `<button class="button button-secondary" data-go="tables">← Mesas</button>`)}
     <section class="section-panel"><div class="section-title"><h2>Carta</h2><button class="text-button" data-go="menu">Editar carta →</button></div><div class="category-row">${categoryButtons}</div><div class="product-grid">${products || `<div class="empty-state">No hay productos en esta categoría.</div>`}</div></section>
-    <section class="table-section section-panel"><div class="section-title"><h2>Pedido <span class="order-meta">${table.items.length} productos</span></h2><strong>${money(tableTotal(table))}</strong></div><div class="order-list">${orderRows}</div><div class="dialog-actions">${disabledPayMessage}${sendButton}${downloadButton}${payButton}</div></section>`;
+    <section class="table-section section-panel"><div class="section-title"><h2>Pedido <span class="order-meta">${table.items.length} productos</span></h2><strong>${money(tableTotal(table))}</strong></div><div class="order-list">${orderRows}</div><div class="dialog-actions">${disabledPayMessage}${sendButton}${payButton}</div></section>`;
 }
 
 function kitchenTiming(timestamp) {
