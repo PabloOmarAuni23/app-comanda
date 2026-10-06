@@ -417,6 +417,13 @@ def mutate_state(action):
                 raise ValueError("No hay productos nuevos para enviar.")
             for item in pending:
                 item.update(status="sent", sent_at=stamp)
+        elif action_type == "order_retrieve":
+            table = find_table()
+            item = next((entry for entry in table["items"] if entry["id"] == str(action.get("item_id", ""))), None)
+            if item is None or item["status"] not in {"sent", "preparing"}:
+                raise ValueError("No se encontró el producto o no está en cola de cocina.")
+            item["status"] = "ready"
+            item["retrieved_at"] = stamp
         elif action_type == "item_status":
             table = find_table()
             item = next((entry for entry in table["items"] if entry["id"] == str(action.get("item_id", ""))), None)

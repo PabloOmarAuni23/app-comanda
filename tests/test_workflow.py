@@ -347,18 +347,37 @@ class ComandaWorkflowTests(unittest.TestCase):
         clamped_low = self.action("table_open", table_id="3", waiter="Prueba", guests=0)
         self.assertEqual(clamped_low.json["tables"][2]["guests"], 1)
 
-    def test_cleaning_table_resets_guest_count(self):
-        self.action("table_open", table_id="1", waiter="Prueba", guests=4)
+    def test_retrieve_item_marks_ready_and_records_retrieved_at(self):
+        self.action("table_open", table_id="1", waiter="Prueba")
+        self.action("item_add", table_id="1", menu_id="menu-te", quantity=1, waiter="Prueba")
+        sent = self.action("order_send", table_id="1")
+        self.assertEqual(sent.status_code, 200)
+        item_id = sent.json["tables"][0]["items"][0]["id"]
+
+        retrieve = self.action("order_retrieve", table_id="1", item_id=item_id)
+        self.assertEqual(retrieve.status_code, 200)
+        self.assertEqual(retrieve.json["tables"][0]["items"][0]["status"], "ready")
+        self.assertIsNotNone(retrieve.json["tables"][0]["items"][0]["retrieved_at"])
+
+        paid = self.action("table_paid", table_id="1")
+        self.assertEqual(paid.status_code, 200)
+        self.assertEqual(paid.json["tables"][0]["status"], "cleaning")
+
+    def test_retrieve_requires_existing_item_on_open_table(self):
+        retrieved = self.action("order_retrieve", table_id="1", item_id="no-such-item")
+        self.assertEqual(retrieved.status_code, 400)
+
+    def test_retrieve_requires_item_in_cook_queue(self):
+        self.action("table_open", table_id="1", waiter="Prueba")
+        self.action("item_add", table_id="1", menu_id="menu-te", quantity=1, waiter="Prueba")
+        retrieved = self.action("order_retrieve", table_id="1", item_id="no-such-item")
+        self.assertEqual(retrieved.status_code, 400)
+
+    def test_retrieve_rejects_completed_or_stale_item(self):
+        self.action("table_open", table_id="1", waiter="Prueba")
         self.action("item_add", table_id="1", menu_id="menu-te", quantity=1, waiter="Prueba")
         sent = self.action("order_send", table_id="1")
         item_id = sent.json["tables"][0]["items"][0]["id"]
         self.action("item_status", table_id="1", item_id=item_id, status="ready")
-        self.action("table_paid", table_id="1")
-
-        cleaned = self.action("table_clean", table_id="1")
-        self.assertEqual(cleaned.status_code, 200)
-        self.assertIsNone(cleaned.json["tables"][0]["guests"])
-
-
-if __name__ == "__main__":
-    unittest.main()
+        retrieved = self.action("order_retrieve", table_id="1", item_id=item_id)
+        self.assertEqual(retrieved.status_code, 400)

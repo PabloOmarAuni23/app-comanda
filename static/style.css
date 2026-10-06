@@ -188,6 +188,8 @@ h1, h2, h3 { font-family: 'Manrope', 'Avenir Next', sans-serif; }
 .ticket-item-controls { gap: 3px; }
 .kitchen-state-select { max-width: 112px; min-width: 0; height: 27px; padding: 0 4px; border: 1px solid var(--line); border-radius: 4px; color: var(--ink); background: #0e1112; font-size: 9px; }
 .kitchen-advance { width: 27px; height: 27px; flex: 0 0 27px; border: 1px solid var(--line); border-radius: 4px; color: var(--green); background: #0e1112; cursor: pointer; font-size: 10px; }
+.kitchen-retrieve { flex: 1 1 auto; min-width: 0; padding: 0 6px; justify-content: flex-start; text-align: left; font-size: 9px; }
+.kitchen-retrieve:disabled { opacity: 0.45; cursor: default; }
 .ticket-item-priority { display: flex; }
 .priority-toggle { font-size: 9px; }
 .priority-toggle input { width: 13px; height: 13px; }
