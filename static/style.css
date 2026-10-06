@@ -23,6 +23,7 @@
 }
 
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
 body { margin: 0; min-width: 320px; min-height: 100vh; background: radial-gradient(ellipse at 9% 8%, rgba(255,255,255,.05), transparent 36%), var(--paper); }
 button, input, textarea, select { font: inherit; }
 button { color: inherit; }
@@ -293,6 +294,7 @@ h1, h2, h3 { font-family: 'Manrope', 'Avenir Next', sans-serif; }
   .ticket-item { padding: 10px; }
   .order-row { grid-template-columns: 1fr auto; gap: 7px; }
   .order-row .status { grid-column: 1; grid-row: 2; justify-self: start; }
+  .order-row .flow-chips { grid-column: 1; grid-row: 2; justify-self: start; }
   .order-price { grid-column: 2; grid-row: 1 / span 2; }
   .modifier-option { grid-template-columns: minmax(0, 1fr) 88px 34px; gap: 5px; }
   .modifier-option .dialog-field { font-size: 10px; }
@@ -323,3 +325,31 @@ h1, h2, h3 { font-family: 'Manrope', 'Avenir Next', sans-serif; }
 .sales-closure-items { display: flex; flex-wrap: wrap; gap: 5px 12px; }
 .sales-closure-total { color: var(--green); font-size: 12px; }
 @media (max-width: 540px) { .sales-close-actions { display: grid; } .sales-close-actions .button { width: 100%; } }
+
+.flow-chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.flow-chip { display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 8.5px; font-weight: 800; text-transform: uppercase; letter-spacing: .03em; white-space: nowrap; }
+.flow-draft { color: #1f2426; background: #e7e2dc; border: 1px solid var(--line); }
+.flow-sent { color: #7a4a00; background: var(--orange-soft); border: 1px solid var(--orange); }
+.flow-preparing { color: #6b5600; background: #33270a; border: 1px solid #5c4a12; }
+.flow-suspended { color: #6b0000; background: var(--red-soft); border: 1px solid var(--red); }
+.flow-ready { color: #0b4f2e; background: var(--green-soft); border: 1px solid var(--green); }
+
+.role-screen { display: grid; gap: 28px; justify-items: center; padding: 46px 0 24px; text-align: center; }
+.role-brand { display: grid; justify-items: center; gap: 8px; }
+.role-brand .brand-mark { width: 54px; height: 54px; border-radius: 15px; font-size: 26px; border: 1px solid var(--line); background: var(--surface); }
+.role-brand .eyebrow { margin: 0; color: var(--green); font-size: 11px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
+.role-brand h1 { margin: 0; font-size: 28px; line-height: 1.2; }
+.role-brand p:last-child { margin: 6px 0 0; color: var(--muted); font-size: 12.5px; line-height: 1.7; max-width: 48ch; }
+.role-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; width: min(640px, 100%); }
+.role-card { display: grid; gap: 10px; justify-items: center; align-content: center; padding: 30px 24px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); cursor: pointer; transition: border-color .15s, transform .15s, background .15s; text-align: left; }
+.role-card:hover, .role-card:focus-visible { border-color: var(--green); transform: translateY(-3px); }
+.role-card:active { transform: translateY(0); }
+.role-card[data-role="cocina"]:hover { border-color: var(--orange); background: var(--orange-soft); }
+.role-card .role-icon { font-size: 34px; line-height: 1; }
+.role-card strong { font: 800 19px 'Manrope', sans-serif; margin: 0; }
+.role-card span:last-child { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.6; max-width: 24ch; }
+@media (max-width: 540px) { .role-grid { grid-template-columns: 1fr; } }
+
+.page-heading-buttons { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-start; }
+
+

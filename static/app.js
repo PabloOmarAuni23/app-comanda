@@ -13,6 +13,8 @@ let activeView = "home";
 let activeTableId = null;
 let activeCategory = "Todas";
 let kitchenTimingFilter = "all";
+let currentRole = "";
+try { currentRole = localStorage.getItem("comandaRole") || ""; } catch (error) { currentRole = ""; }
 let lastToastTimer;
 let deferredInstallPrompt = null;
 let requestPending = false;
@@ -35,22 +37,77 @@ function tableTotal(table) {
   return table.items.reduce((sum, item) => sum + item.price * item.quantity, 0);
 }
 
-function itemModifierLines(item) {
+function itemModifierParts(item) {
   return (item.modifiers || []).map((modifier) => {
     const quantity = modifier.quantity * item.quantity;
-    const option = quantity > 1 ? `${quantity} × ${escapeHtml(modifier.name)}` : escapeHtml(modifier.name);
-    return `${escapeHtml(modifier.group)}: ${option}`;
+    return { group: String(modifier.group ?? ""), option: quantity > 1 ? `${quantity} × ${modifier.name}` : String(modifier.name ?? "") };
   });
+}
+
+function itemModifierLines(item) {
+  return itemModifierParts(item).map((part) => `${escapeHtml(part.group)}: ${escapeHtml(part.option)}`);
 }
 
 function itemModifierSummary(item) {
   return itemModifierLines(item).join(" · ");
 }
 
+function itemModifierText(item) {
+  return itemModifierParts(item).map((part) => `${part.group}: ${part.option}`).join(" · ");
+}
+
 function guestsSuffix(table) {
   const guests = Number(table.guests);
   if (!Number.isFinite(guests) || guests < 1) return "";
   return ` · ${guests} ${guests === 1 ? "persona" : "personas"}`;
+}
+
+function orderFlow(table) {
+  const counts = { draft: 0, sent: 0, preparing: 0, suspended: 0, ready: 0 };
+  table.items.forEach((item) => { if (item.status in counts) counts[item.status] += 1; });
+  const chips = [];
+  if (counts.draft) chips.push(["flow-draft", `${counts.draft} sin enviar`]);
+  if (counts.sent) chips.push(["flow-sent", `${counts.sent} en cocina`]);
+  if (counts.preparing) chips.push(["flow-preparing", `${counts.preparing} preparando`]);
+  if (counts.suspended) chips.push(["flow-suspended", `${counts.suspended} demorado${counts.suspended > 1 ? "s" : ""}`]);
+  if (counts.ready) chips.push(["flow-ready", `${counts.ready} listo${counts.ready > 1 ? "s" : ""}`]);
+  return chips.length ? `<span class="flow-chips">${chips.map(([cls, label]) => `<b class="flow-chip ${cls}">${label}</b>`).join("")}</span>` : "";
+}
+
+function csvCell(value) {
+  return `"${String(value ?? "").replace(/"/g, "\"\"")}"`;
+}
+
+function downloadTableReport(table) {
+  const header = ["Mesa", "Comensales", "Atiende", "Producto", "Cantidad", "Detalle (agregados, acompañamientos)", "Nota para cocina", "Prioridad", "Estado", "Precio unitario", "Importe", "Agregado por", "Enviado a cocina"];
+  const rows = table.items.map((item) => [
+    table.name,
+    Number(table.guests) > 0 ? table.guests : "",
+    table.opened_by,
+    item.name,
+    item.quantity,
+    itemModifierText(item),
+    item.note || "",
+    item.priority ? "Sí" : "No",
+    statusLabel(item.status),
+    item.price,
+    item.price * item.quantity,
+    item.added_by || "",
+    item.sent_at || "",
+  ]);
+  const totalUnits = table.items.reduce((sum, item) => sum + item.quantity, 0);
+  rows.push(["TOTAL", "", "", "", totalUnits, "", "", "", "", "", tableTotal(table), "", ""]);
+  const csv = "\uFEFF" + [header, ...rows].map((row) => row.map(csvCell).join(";")).join("\r\n");
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  const slug = table.name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "mesa";
+  link.href = url;
+  link.download = `comanda-${slug}-${new Date().toISOString().slice(0, 10)}.csv`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
 }
 
 function statusLabel(status) {
@@ -115,6 +172,11 @@ function pageHeading(eyebrow, title, subtitle, button = "") {
 }
 
 function renderReadyNotice() {
+  if (currentRole !== "mozo") {
+    readyNoticeElement.hidden = true;
+    readyNoticeElement.innerHTML = "";
+    return;
+  }
   const readyTables = state.tables
     .filter((table) => table.status === "open")
     .map((table) => ({ ...table, readyItems: table.items.filter((item) => item.status === "ready") }))
@@ -139,10 +201,31 @@ function renderReadyNotice() {
   readyNoticeElement.innerHTML = `<span class="ready-notice-icon" aria-hidden="true">!</span><span class="ready-notice-copy"><strong>¡Hay pedidos listos para retirar!</strong><span>${summary}</span><span class="ready-notice-items">${preview}${remaining ? ` &nbsp; | &nbsp; y ${remaining} más` : ""}</span></span><span class="ready-notice-action">Ir a buscar →</span>`;
 }
 
+function applyRoleUi() {
+  const picking = !currentRole;
+  const kitchenOnly = currentRole === "cocina";
+  document.querySelector(".main-nav").hidden = picking || kitchenOnly;
+  document.querySelector(".waiter-field").hidden = picking || kitchenOnly;
+  document.querySelector("#roleButton").hidden = picking;
+  document.querySelectorAll(".nav-button").forEach((button) => {
+    if (picking) button.classList.remove("active");
+    else button.classList.toggle("active", kitchenOnly ? button.dataset.view === "kitchen" : button.dataset.view === activeView);
+  });
+}
+
+function renderRolePicker() {
+  applyRoleUi();
+  readyNoticeElement.hidden = true;
+  readyNoticeElement.innerHTML = "";
+  appRoot.innerHTML = `<section class="role-screen"><div class="role-brand"><span class="brand-mark" aria-hidden="true">C</span><p class="eyebrow">Comanda del bar</p><h1>¿Cómo entrás hoy?</h1><p>Elegí un perfil para empezar. Podés cambiarlo cuando quieras con el botón ⇄ de la barra superior.</p></div><div class="role-grid"><button class="role-card" type="button" data-role="mozo"><span class="role-icon" aria-hidden="true">🍽</span><strong>Mozo / Moza</strong><span>Ves todo: mesas, carta, cocina, estado de los pedidos y descarga del detalle de cada mesa.</span></button><button class="role-card" type="button" data-role="cocina"><span class="role-icon" aria-hidden="true">♨</span><strong>Cocina</strong><span>Solo la producción: comandas, agregados, notas, prioridades y estados.</span></button></div></section>`;
+}
+
 function render() {
+  if (!currentRole) { renderRolePicker(); return; }
   if (!state) return;
+  if (currentRole === "cocina") activeView = "kitchen";
+  applyRoleUi();
   renderReadyNotice();
-  document.querySelectorAll(".nav-button").forEach((button) => button.classList.toggle("active", button.dataset.view === activeView));
   if (activeView === "home") renderHome();
   if (activeView === "tables") renderTables();
   if (activeView === "table-detail") renderTableDetail();
@@ -158,7 +241,7 @@ function renderHome() {
   const ready = state.tables.flatMap((table) => table.items).filter((item) => item.status === "ready").length;
   const tables = state.tables.slice(0, 8).map((table) => `<button class="mini-table ${table.status === "open" ? "occupied" : ""}" data-table="${escapeHtml(table.id)}"><strong>${escapeHtml(table.name)}</strong><span>${table.status === "open" ? money(tableTotal(table)) : statusLabel(table.status)}</span></button>`).join("");
   const liveOrders = state.tables.filter((table) => table.status === "open" && table.items.length).slice(0, 4);
-  const activity = liveOrders.length ? liveOrders.map((table) => `<button class="order-row" data-table="${escapeHtml(table.id)}"><span><span class="order-name">${escapeHtml(table.name)}</span><br><span class="order-meta">${table.items.length} ${table.items.length === 1 ? "producto" : "productos"} · ${escapeHtml(table.opened_by)}${guestsSuffix(table)}</span></span><span class="status open">${table.items.some((item) => item.status === "draft") ? "Sin enviar" : "En curso"}</span><span class="order-price">${money(tableTotal(table))}</span></button>`).join("") : `<div class="activity-empty"><div class="empty-mark">⌂</div>Las mesas abiertas van a aparecer acá.</div>`;
+  const activity = liveOrders.length ? liveOrders.map((table) => `<button class="order-row" data-table="${escapeHtml(table.id)}"><span><span class="order-name">${escapeHtml(table.name)}</span><br><span class="order-meta">${table.items.length} ${table.items.length === 1 ? "producto" : "productos"} · ${escapeHtml(table.opened_by)}${guestsSuffix(table)}</span></span>${orderFlow(table) || `<span class="status open">En curso</span>`}<span class="order-price">${money(tableTotal(table))}</span></button>`).join("") : `<div class="activity-empty"><div class="empty-mark">⌂</div>Las mesas abiertas van a aparecer acá.</div>`;
 
   appRoot.innerHTML = `${pageHeading("Resumen del turno", "Comanda del bar", "Mesas, pedidos y cocina se actualizan entre todos los dispositivos.", `<button class="button button-secondary" data-go="statistics">Estadística</button>`)}
     <section class="stats" aria-label="Resumen de mesas y pedidos">
@@ -198,7 +281,7 @@ function renderTables() {
   const tiles = state.tables.map((table) => {
     const description = table.status === "open" ? `${table.items.length} productos · ${money(tableTotal(table))}` : table.status === "cleaning" ? "Cobro registrado" : "Tocá para abrir";
     const caption = table.status === "open" ? `Atiende ${table.opened_by}${guestsSuffix(table)}` : statusLabel(table.status);
-    return `<button class="table-tile ${table.status}" data-table="${escapeHtml(table.id)}"><span class="status ${table.status}">${statusLabel(table.status)}</span><strong>${escapeHtml(table.name)}</strong><span class="table-detail">${escapeHtml(description)}</span><span class="table-detail">${escapeHtml(caption)}</span></button>`;
+    return `<button class="table-tile ${table.status}" data-table="${escapeHtml(table.id)}"><span class="status ${table.status}">${statusLabel(table.status)}</span><strong>${escapeHtml(table.name)}</strong><span class="table-detail">${escapeHtml(description)}</span><span class="table-detail">${escapeHtml(caption)}</span>${table.status === "open" ? orderFlow(table) : ""}</button>`;
   }).join("");
   appRoot.innerHTML = `${pageHeading("Servicio", "Mesas", `${openCount} abiertas · tocá una mesa para abrirla o ver el pedido.`, createButton)}<div class="table-grid">${tiles}</div>`;
 }
@@ -207,7 +290,7 @@ function renderTableDetail() {
   const table = state.tables.find((entry) => entry.id === activeTableId);
   if (!table) { activeView = "tables"; renderTables(); return; }
   if (table.status === "cleaning") {
-    appRoot.innerHTML = `${pageHeading("Mesa cobrada", table.name, "La cuenta está cerrada. Cuando terminen de limpiar, liberá la mesa.", `<button class="button button-primary" data-action="clean-table" data-table-id="${escapeHtml(table.id)}">✓ Mesa limpia</button>`)}<section class="section-panel"><div class="empty-state"><div class="empty-mark">✓</div><h2>Cuenta cobrada</h2><p>Esta mesa queda visible para todo el equipo hasta marcarla limpia.</p></div></section>`;
+    appRoot.innerHTML = `${pageHeading("Mesa cobrada", table.name, "La cuenta está cerrada. Cuando terminen de limpiar, liberá la mesa.", `<div class="page-heading-buttons"><button class="button button-secondary" data-action="download-table-report" data-table-id="${escapeHtml(table.id)}">↓ Descargar detalle</button><button class="button button-primary" data-action="clean-table" data-table-id="${escapeHtml(table.id)}">✓ Mesa limpia</button></div>`)}<section class="section-panel"><div class="empty-state"><div class="empty-mark">✓</div><h2>Cuenta cobrada</h2><p>Esta mesa queda visible para todo el equipo hasta marcarla limpia.</p></div></section>`;
     return;
   }
   if (table.status !== "open") { activeView = "tables"; renderTables(); return; }
@@ -221,10 +304,11 @@ function renderTableDetail() {
   const sendButton = hasDraft ? `<button class="button button-primary" data-action="send-order" data-table-id="${escapeHtml(table.id)}">Enviar a cocina</button>` : "";
   const canPay = table.items.length > 0 && !hasDraft && table.items.every((item) => item.status === "ready");
   const payButton = canPay ? `<button class="button button-secondary" data-action="pay-table" data-table-id="${escapeHtml(table.id)}">Cobrar ${money(tableTotal(table))}</button>` : "";
+  const downloadButton = table.items.length ? `<button class="button button-secondary" data-action="download-table-report" data-table-id="${escapeHtml(table.id)}">↓ Descargar detalle</button>` : "";
   const disabledPayMessage = table.items.length && !canPay ? `<p class="order-meta">${hasDraft ? "Enviá los productos nuevos a cocina para cobrar." : "Podés cobrar cuando todos los productos estén listos."}</p>` : "";
   appRoot.innerHTML = `${pageHeading("Pedido de mesa", table.name, `Abierta por ${escapeHtml(table.opened_by)}${guestsSuffix(table)} · Total ${money(tableTotal(table))}`, `<button class="button button-secondary" data-go="tables">← Mesas</button>`)}
     <section class="section-panel"><div class="section-title"><h2>Carta</h2><button class="text-button" data-go="menu">Editar carta →</button></div><div class="category-row">${categoryButtons}</div><div class="product-grid">${products || `<div class="empty-state">No hay productos en esta categoría.</div>`}</div></section>
-    <section class="table-section section-panel"><div class="section-title"><h2>Pedido <span class="order-meta">${table.items.length} productos</span></h2><strong>${money(tableTotal(table))}</strong></div><div class="order-list">${orderRows}</div><div class="dialog-actions">${disabledPayMessage}${sendButton}${payButton}</div></section>`;
+    <section class="table-section section-panel"><div class="section-title"><h2>Pedido <span class="order-meta">${table.items.length} productos</span></h2><strong>${money(tableTotal(table))}</strong></div><div class="order-list">${orderRows}</div><div class="dialog-actions">${disabledPayMessage}${sendButton}${downloadButton}${payButton}</div></section>`;
 }
 
 function kitchenTiming(timestamp) {
@@ -535,6 +619,8 @@ function syncConditionalModifierGroups() {
 }
 
 function setView(view) {
+  if (!currentRole) return;
+  if (currentRole === "cocina") view = "kitchen";
   activeView = view;
   activeTableId = null;
   render();
@@ -553,6 +639,16 @@ appRoot.addEventListener("change", async (event) => {
 });
 
 appRoot.addEventListener("click", async (event) => {
+  const profileButton = event.target.closest("[data-role]");
+  if (profileButton) {
+    currentRole = profileButton.dataset.role === "cocina" ? "cocina" : "mozo";
+    try { localStorage.setItem("comandaRole", currentRole); } catch (error) {}
+    activeView = currentRole === "cocina" ? "kitchen" : "home";
+    activeTableId = null;
+    render();
+    showToast(currentRole === "cocina" ? "Perfil Cocina activo." : "Perfil Mozo activo.");
+    return;
+  }
   const filterButton = event.target.closest("[data-kitchen-filter]");
   if (filterButton) { kitchenTimingFilter = filterButton.dataset.kitchenFilter; render(); return; }
   const goButton = event.target.closest("[data-go]");
@@ -609,6 +705,10 @@ appRoot.addEventListener("click", async (event) => {
   if (actionButton.dataset.action === "clean-table") {
     const cleaned = await sendAction({ type: "table_clean", table_id: tableId }, "Mesa liberada.");
     if (cleaned) setView("tables");
+  }
+  if (actionButton.dataset.action === "download-table-report") {
+    const reportTable = state.tables.find((entry) => entry.id === tableId);
+    if (reportTable) downloadTableReport(reportTable);
   }
   if (actionButton.dataset.action === "item-status") {
     await sendAction({ type: "item_status", table_id: tableId, item_id: actionButton.dataset.itemId, status: actionButton.dataset.status });
@@ -668,7 +768,15 @@ document.querySelector("#installButton").addEventListener("click", async () => {
   document.querySelector("#installButton").hidden = true;
 });
 
-if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js?v=9").catch(() => {});
+document.querySelector("#roleButton").addEventListener("click", () => {
+  currentRole = "";
+  try { localStorage.removeItem("comandaRole"); } catch (error) {}
+  activeView = "home";
+  activeTableId = null;
+  render();
+});
+
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js?v=12").catch(() => {});
 loadState(true);
 setInterval(() => loadState(), 2200);
 setInterval(() => {
