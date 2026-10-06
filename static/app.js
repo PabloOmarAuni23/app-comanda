@@ -49,7 +49,7 @@ function statusLabel(status) {
 
 function showToast(message, error = false) {
   toastElement.textContent = message;
-  toastElement.style.background = error ? "#9e4034" : "#202923";
+  toastElement.style.background = error ? "#9e4034" : "#171b1a";
   toastElement.classList.add("show");
   clearTimeout(lastToastTimer);
   lastToastTimer = setTimeout(() => toastElement.classList.remove("show"), 2600);
