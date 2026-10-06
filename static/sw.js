@@ -1,4 +1,4 @@
-const CACHE_NAME = "comanda-shell-v10";
+const CACHE_NAME = "comanda-shell-v11";
 const APP_SHELL = ["/", "/static/style.css", "/static/app.js", "/static/icon.svg", "/static/icon-192.png", "/static/icon-512.png", "/static/apple-touch-icon.png", "/manifest.json"];
 
 self.addEventListener("install", (event) => {

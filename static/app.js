@@ -47,6 +47,12 @@ function itemModifierSummary(item) {
   return itemModifierLines(item).join(" · ");
 }
 
+function guestsSuffix(table) {
+  const guests = Number(table.guests);
+  if (!Number.isFinite(guests) || guests < 1) return "";
+  return ` · ${guests} ${guests === 1 ? "persona" : "personas"}`;
+}
+
 function statusLabel(status) {
   return ({ free: "Libre", open: "Abierta", cleaning: "Para limpiar", draft: "Sin enviar", sent: "En cocina", preparing: "En proceso", ready: "Listo", suspended: "Demorado" })[status] || status;
 }
@@ -152,7 +158,7 @@ function renderHome() {
   const ready = state.tables.flatMap((table) => table.items).filter((item) => item.status === "ready").length;
   const tables = state.tables.slice(0, 8).map((table) => `<button class="mini-table ${table.status === "open" ? "occupied" : ""}" data-table="${escapeHtml(table.id)}"><strong>${escapeHtml(table.name)}</strong><span>${table.status === "open" ? money(tableTotal(table)) : statusLabel(table.status)}</span></button>`).join("");
   const liveOrders = state.tables.filter((table) => table.status === "open" && table.items.length).slice(0, 4);
-  const activity = liveOrders.length ? liveOrders.map((table) => `<button class="order-row" data-table="${escapeHtml(table.id)}"><span><span class="order-name">${escapeHtml(table.name)}</span><br><span class="order-meta">${table.items.length} ${table.items.length === 1 ? "producto" : "productos"} · ${escapeHtml(table.opened_by)}</span></span><span class="status open">${table.items.some((item) => item.status === "draft") ? "Sin enviar" : "En curso"}</span><span class="order-price">${money(tableTotal(table))}</span></button>`).join("") : `<div class="activity-empty"><div class="empty-mark">⌂</div>Las mesas abiertas van a aparecer acá.</div>`;
+  const activity = liveOrders.length ? liveOrders.map((table) => `<button class="order-row" data-table="${escapeHtml(table.id)}"><span><span class="order-name">${escapeHtml(table.name)}</span><br><span class="order-meta">${table.items.length} ${table.items.length === 1 ? "producto" : "productos"} · ${escapeHtml(table.opened_by)}${guestsSuffix(table)}</span></span><span class="status open">${table.items.some((item) => item.status === "draft") ? "Sin enviar" : "En curso"}</span><span class="order-price">${money(tableTotal(table))}</span></button>`).join("") : `<div class="activity-empty"><div class="empty-mark">⌂</div>Las mesas abiertas van a aparecer acá.</div>`;
 
   appRoot.innerHTML = `${pageHeading("Resumen del turno", "Comanda del bar", "Mesas, pedidos y cocina se actualizan entre todos los dispositivos.", `<button class="button button-secondary" data-go="statistics">Estadística</button>`)}
     <section class="stats" aria-label="Resumen de mesas y pedidos">
@@ -191,7 +197,7 @@ function renderTables() {
   const createButton = `<button class="button button-primary" data-action="add-table">＋ <span>Mesa</span></button>`;
   const tiles = state.tables.map((table) => {
     const description = table.status === "open" ? `${table.items.length} productos · ${money(tableTotal(table))}` : table.status === "cleaning" ? "Cobro registrado" : "Tocá para abrir";
-    const caption = table.status === "open" ? `Atiende ${table.opened_by}` : statusLabel(table.status);
+    const caption = table.status === "open" ? `Atiende ${table.opened_by}${guestsSuffix(table)}` : statusLabel(table.status);
     return `<button class="table-tile ${table.status}" data-table="${escapeHtml(table.id)}"><span class="status ${table.status}">${statusLabel(table.status)}</span><strong>${escapeHtml(table.name)}</strong><span class="table-detail">${escapeHtml(description)}</span><span class="table-detail">${escapeHtml(caption)}</span></button>`;
   }).join("");
   appRoot.innerHTML = `${pageHeading("Servicio", "Mesas", `${openCount} abiertas · tocá una mesa para abrirla o ver el pedido.`, createButton)}<div class="table-grid">${tiles}</div>`;
@@ -216,7 +222,7 @@ function renderTableDetail() {
   const canPay = table.items.length > 0 && !hasDraft && table.items.every((item) => item.status === "ready");
   const payButton = canPay ? `<button class="button button-secondary" data-action="pay-table" data-table-id="${escapeHtml(table.id)}">Cobrar ${money(tableTotal(table))}</button>` : "";
   const disabledPayMessage = table.items.length && !canPay ? `<p class="order-meta">${hasDraft ? "Enviá los productos nuevos a cocina para cobrar." : "Podés cobrar cuando todos los productos estén listos."}</p>` : "";
-  appRoot.innerHTML = `${pageHeading("Pedido de mesa", table.name, `Abierta por ${escapeHtml(table.opened_by)} · Total ${money(tableTotal(table))}`, `<button class="button button-secondary" data-go="tables">← Mesas</button>`)}
+  appRoot.innerHTML = `${pageHeading("Pedido de mesa", table.name, `Abierta por ${escapeHtml(table.opened_by)}${guestsSuffix(table)} · Total ${money(tableTotal(table))}`, `<button class="button button-secondary" data-go="tables">← Mesas</button>`)}
     <section class="section-panel"><div class="section-title"><h2>Carta</h2><button class="text-button" data-go="menu">Editar carta →</button></div><div class="category-row">${categoryButtons}</div><div class="product-grid">${products || `<div class="empty-state">No hay productos en esta categoría.</div>`}</div></section>
     <section class="table-section section-panel"><div class="section-title"><h2>Pedido <span class="order-meta">${table.items.length} productos</span></h2><strong>${money(tableTotal(table))}</strong></div><div class="order-list">${orderRows}</div><div class="dialog-actions">${disabledPayMessage}${sendButton}${payButton}</div></section>`;
 }
@@ -267,7 +273,7 @@ function renderKitchen() {
       const priorityToggle = `<label class="priority-toggle"><input type="checkbox" data-action="item-priority" data-table-id="${escapeHtml(table.id)}" data-item-id="${escapeHtml(item.id)}" ${item.priority ? "checked" : ""}><span>Prioridad</span></label>`;
       return `<article class="ticket-item ${item.priority ? "ticket-priority" : ""}"><div class="ticket-product"><span class="ticket-item-quantity">${item.quantity}</span><div><strong>${escapeHtml(item.name)}</strong>${modifierLines.length ? `<p class="ticket-modifiers">${modifierLines.join("<br>")}</p>` : ""}${item.note ? `<p class="ticket-note">${escapeHtml(item.note)}</p>` : ""}</div></div><div class="ticket-item-controls"><select class="kitchen-state-select" aria-label="Estado de ${escapeHtml(item.name)}" data-action="item-status-select" data-table-id="${escapeHtml(table.id)}" data-item-id="${escapeHtml(item.id)}">${optionMarkup}</select><button class="kitchen-advance" type="button" title="${nextLabel}" aria-label="${nextLabel}" data-action="item-status" data-table-id="${escapeHtml(table.id)}" data-item-id="${escapeHtml(item.id)}" data-status="${nextStatus}">▶</button></div><div class="ticket-item-priority">${priorityToggle}</div></article>`;
     }).join("");
-    return `<section class="kitchen-ticket"><header class="ticket-head ${timing.className}"><div class="ticket-heading-main"><div class="ticket-heading-top"><span class="ticket-sent-time">${kitchenSentTime(oldestItem.sent_at)}</span><span class="kitchen-timer" role="timer" aria-label="Pedido hace ${timing.minutes} minutos: ${timing.label}"><strong>${timing.minutes} min</strong></span></div><h2>${escapeHtml(table.name)}</h2><p>Principal · Atiende ${escapeHtml(table.opened_by)}</p></div><span class="status open">${items.length} prod.</span></header><div class="ticket-items">${renderedItems}</div><footer class="ticket-footer"><span class="ticket-footer-meta">${items.length} pendientes</span><button class="button button-finish-all" data-action="finish-ticket" data-table-id="${escapeHtml(table.id)}">Terminar todo</button></footer></section>`;
+    return `<section class="kitchen-ticket"><header class="ticket-head ${timing.className}"><div class="ticket-heading-main"><div class="ticket-heading-top"><span class="ticket-sent-time">${kitchenSentTime(oldestItem.sent_at)}</span><span class="kitchen-timer" role="timer" aria-label="Pedido hace ${timing.minutes} minutos: ${timing.label}"><strong>${timing.minutes} min</strong></span></div><h2>${escapeHtml(table.name)}</h2><p>Principal · Atiende ${escapeHtml(table.opened_by)}${guestsSuffix(table)}</p></div><span class="status open">${items.length} prod.</span></header><div class="ticket-items">${renderedItems}</div><footer class="ticket-footer"><span class="ticket-footer-meta">${items.length} pendientes</span><button class="button button-finish-all" data-action="finish-ticket" data-table-id="${escapeHtml(table.id)}">Terminar todo</button></footer></section>`;
   }).join("");
   const readyCount = state.tables.reduce((sum, table) => sum + table.items.filter((item) => item.status === "ready").length, 0);
   appRoot.innerHTML = `<div class="kitchen-board-heading"><div><p class="eyebrow">Producción</p><h1>Cocina</h1></div><span class="status ready">${readyCount} listos</span></div><div class="kitchen-toolbar" aria-label="Filtrar comandas">${filters}</div><div class="kitchen-grid">${cards || `<section class="section-panel kitchen-empty"><div class="empty-state"><div class="empty-mark">♨</div><h2>${activeItems.length ? "No hay pedidos en este filtro" : "Cocina al día"}</h2><p>${activeItems.length ? "Elegí otro tiempo para ver las comandas." : "Los pedidos enviados por los mozos van a aparecer acá."}</p></div></section>`}</div>`;
@@ -303,12 +309,13 @@ function showAddTableDialog() {
 }
 
 function showOpenTableDialog(table) {
-  const body = `<label class="dialog-field">Nombre del mozo o moza<input name="waiter" maxlength="40" value="${escapeHtml(waiterInput.value)}" placeholder="Escribí tu nombre" required></label>`;
-  showDialog({ eyebrow: table.name, title: "¿Quién abre esta mesa?", body, submitLabel: "Abrir mesa", onSubmit: async (data) => {
+  const body = `<label class="dialog-field">¿Cuántas personas se sientan?<div class="quantity-stepper"><button class="quantity-step" type="button" data-quantity-step="-1" aria-label="Menos personas">−</button><input name="guests" type="number" min="1" max="30" value="2" inputmode="none" readonly required aria-live="polite"><button class="quantity-step" type="button" data-quantity-step="1" aria-label="Más personas">+</button></div></label><label class="dialog-field">Nombre del mozo o moza<input name="waiter" maxlength="40" value="${escapeHtml(waiterInput.value)}" placeholder="Escribí tu nombre" required></label>`;
+  showDialog({ eyebrow: table.name, title: "Abrir mesa", body, submitLabel: "Abrir mesa", onSubmit: async (data) => {
     const waiter = data.waiter.trim().slice(0, 40);
     if (!waiter) return false;
+    const guests = Math.max(1, Math.min(30, Number(data.guests) || 1));
     waiterInput.value = waiter;
-    const opened = await sendAction({ type: "table_open", table_id: table.id, waiter }, `${table.name} abierta por ${waiter}.`);
+    const opened = await sendAction({ type: "table_open", table_id: table.id, waiter, guests }, `${table.name} abierta · ${guests} ${guests === 1 ? "persona" : "personas"} · atiende ${waiter}.`);
     if (opened) {
       activeTableId = table.id;
       activeView = "table-detail";
@@ -442,7 +449,7 @@ function showAddItemDialog(table, dish) {
       ? `<label class="dialog-field modifier-selection" ${wrapperAttributes}>${escapeHtml(group.name)}${group.required ? " · obligatorio" : ""}${conditionHint}<select name="modifier-group-${groupIndex}" data-single-choice ${group.required ? 'data-required="true" required' : ""}><option value="">${group.required ? "Elegí una opción" : "Sin selección"}</option>${options}</select></label>`
       : `<fieldset class="modifier-selection" ${wrapperAttributes}><legend>${escapeHtml(group.name)}${group.required ? " · elegí al menos una" : ""}</legend>${conditionHint}${options}</fieldset>`;
   }).join("");
-  const body = `<div class="dialog-product-line"><strong>${escapeHtml(dish.name)}</strong><span>${money(dish.price)}</span></div>${modifierFields}<label class="dialog-field">Cantidad del producto<div class="quantity-stepper"><button class="quantity-step" type="button" data-quantity-step="-1" aria-label="Disminuir cantidad">−</button><input name="quantity" type="number" min="1" max="99" value="1" inputmode="none" readonly aria-live="polite" required><button class="quantity-step" type="button" data-quantity-step="1" aria-label="Aumentar cantidad">+</button></div></label><label class="priority-field"><input name="priority" type="checkbox"><span>Prioridad</span><small>Producto rápido de preparar</small></label><label class="dialog-field">Nota para cocina<textarea name="note" maxlength="160" placeholder="Ej.: sin azúcar, bien tostado"></textarea></label>`;
+  const body = `<div class="dialog-product-line"><strong>${escapeHtml(dish.name)}</strong><span>${money(dish.price)}</span></div><p class="dialog-hint">Se agrega de a 1 plato por vez · repetí el producto si querés pedir más de uno.</p>${modifierFields}<label class="priority-field"><input name="priority" type="checkbox"><span>Prioridad</span><small>Producto rápido de preparar</small></label><label class="dialog-field">Nota para cocina<textarea name="note" maxlength="160" placeholder="Ej.: sin azúcar, bien tostado"></textarea></label>`;
   showDialog({ eyebrow: table.name, title: "Agregar al pedido", body, submitLabel: "Agregar", onSubmit: (data) => {
     const wrappers = [...dialogBody.querySelectorAll("[data-modifier-wrapper]")];
     const modifiers = [];
@@ -467,7 +474,7 @@ function showAddItemDialog(table, dish) {
       }
     });
     if (groups.some((group, groupIndex) => !wrappers[groupIndex]?.hidden && group.selection === "quantity" && group.required && !modifiers.some((modifier) => modifier.group === group.name))) return false;
-    return sendAction({ type: "item_add", table_id: table.id, menu_id: dish.id, quantity: data.quantity, modifiers, note: data.note, priority: data.priority === "on", waiter: waiterInput.value.trim() || table.opened_by }, `${dish.name} agregado.`);
+    return sendAction({ type: "item_add", table_id: table.id, menu_id: dish.id, quantity: 1, modifiers, note: data.note, priority: data.priority === "on", waiter: waiterInput.value.trim() || table.opened_by }, `${dish.name} agregado.`);
   } });
   syncConditionalModifierGroups();
 }

@@ -280,7 +280,7 @@ def initial_state():
     return {
         "_migrations": ["classic-combo-v1", "classic-combo-v2"],
         "tables": [
-            {"id": str(number), "name": f"Mesa {number}", "status": "free", "opened_by": "", "opened_at": None, "items": []}
+            {"id": str(number), "name": f"Mesa {number}", "status": "free", "opened_by": "", "opened_at": None, "guests": None, "items": []}
             for number in range(1, 9)
         ],
         "pending_sales": [],
@@ -383,12 +383,17 @@ def mutate_state(action):
                 raise ValueError("Escribí el nombre de la mesa.")
             if any(entry["name"].casefold() == name.casefold() for entry in tables):
                 raise ValueError("Ya existe una mesa con ese nombre.")
-            tables.append({"id": str(uuid.uuid4()), "name": name, "status": "free", "opened_by": "", "opened_at": None, "items": []})
+            tables.append({"id": str(uuid.uuid4()), "name": name, "status": "free", "opened_by": "", "opened_at": None, "guests": None, "items": []})
         elif action_type == "table_open":
             table = find_table()
             if table["status"] != "free":
                 raise ValueError("Esta mesa ya está ocupada.")
-            table.update(status="open", opened_by=str(action.get("waiter", "Equipo")).strip()[:40] or "Equipo", opened_at=stamp, items=[])
+            try:
+                guests = int(action.get("guests", 1))
+            except (TypeError, ValueError, OverflowError):
+                guests = 1
+            guests = max(1, min(guests, 30))
+            table.update(status="open", opened_by=str(action.get("waiter", "Equipo")).strip()[:40] or "Equipo", opened_at=stamp, guests=guests, items=[])
         elif action_type == "item_add":
             table = find_table()
             if table["status"] != "open":
@@ -468,7 +473,7 @@ def mutate_state(action):
             table = find_table()
             if table["status"] != "cleaning":
                 raise ValueError("La mesa todavía no está lista para limpiar.")
-            table.update(status="free", opened_by="", opened_at=None, paid_at=None, items=[])
+            table.update(status="free", opened_by="", opened_at=None, paid_at=None, guests=None, items=[])
         elif action_type == "menu_add":
             name = str(action.get("name", "")).strip()[:80]
             category = str(action.get("category", "")).strip()[:40]

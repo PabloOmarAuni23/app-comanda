@@ -331,5 +331,34 @@ class ComandaWorkflowTests(unittest.TestCase):
         self.assertFalse(unmarked.json["tables"][0]["items"][0]["priority"])
 
 
+    def test_table_open_stores_guest_count(self):
+        opened = self.action("table_open", table_id="1", waiter="Prueba", guests=5)
+        self.assertEqual(opened.status_code, 200)
+        self.assertEqual(opened.json["tables"][0]["guests"], 5)
+
+    def test_table_open_clamps_and_defaults_guest_count(self):
+        default_open = self.action("table_open", table_id="1", waiter="Prueba")
+        self.assertEqual(default_open.status_code, 200)
+        self.assertEqual(default_open.json["tables"][0]["guests"], 1)
+
+        clamped_high = self.action("table_open", table_id="2", waiter="Prueba", guests=999)
+        self.assertEqual(clamped_high.json["tables"][1]["guests"], 30)
+
+        clamped_low = self.action("table_open", table_id="3", waiter="Prueba", guests=0)
+        self.assertEqual(clamped_low.json["tables"][2]["guests"], 1)
+
+    def test_cleaning_table_resets_guest_count(self):
+        self.action("table_open", table_id="1", waiter="Prueba", guests=4)
+        self.action("item_add", table_id="1", menu_id="menu-te", quantity=1, waiter="Prueba")
+        sent = self.action("order_send", table_id="1")
+        item_id = sent.json["tables"][0]["items"][0]["id"]
+        self.action("item_status", table_id="1", item_id=item_id, status="ready")
+        self.action("table_paid", table_id="1")
+
+        cleaned = self.action("table_clean", table_id="1")
+        self.assertEqual(cleaned.status_code, 200)
+        self.assertIsNone(cleaned.json["tables"][0]["guests"])
+
+
 if __name__ == "__main__":
     unittest.main()
