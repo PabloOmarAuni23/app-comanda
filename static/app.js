@@ -35,12 +35,16 @@ function tableTotal(table) {
   return table.items.reduce((sum, item) => sum + item.price * item.quantity, 0);
 }
 
-function itemModifierSummary(item) {
+function itemModifierLines(item) {
   return (item.modifiers || []).map((modifier) => {
     const quantity = modifier.quantity * item.quantity;
     const option = quantity > 1 ? `${quantity} × ${escapeHtml(modifier.name)}` : escapeHtml(modifier.name);
     return `${escapeHtml(modifier.group)}: ${option}`;
-  }).join(" · ");
+  });
+}
+
+function itemModifierSummary(item) {
+  return itemModifierLines(item).join(" · ");
 }
 
 function statusLabel(status) {
@@ -257,10 +261,11 @@ function renderKitchen() {
     const renderedItems = items.map((item) => {
       const options = item.status === "sent" ? [["sent", "Pendiente"], ["preparing", "En preparación"], ["ready", "Terminado"], ["suspended", "Demorado"]] : item.status === "preparing" ? [["preparing", "En preparación"], ["ready", "Terminado"], ["suspended", "Demorado"]] : [["suspended", "Demorado"], ["preparing", "En preparación"], ["ready", "Terminado"]];
       const optionMarkup = options.map(([value, label]) => `<option value="${value}" ${item.status === value ? "selected" : ""}>${label}</option>`).join("");
+      const modifierLines = itemModifierLines(item);
       const nextStatus = item.status === "preparing" ? "ready" : "preparing";
       const nextLabel = nextStatus === "preparing" ? "Empezar" : "Terminar producto";
       const priorityToggle = `<label class="priority-toggle"><input type="checkbox" data-action="item-priority" data-table-id="${escapeHtml(table.id)}" data-item-id="${escapeHtml(item.id)}" ${item.priority ? "checked" : ""}><span>Prioridad</span></label>`;
-      return `<article class="ticket-item ${item.priority ? "ticket-priority" : ""}"><div class="ticket-product"><span class="ticket-item-quantity">${item.quantity}</span><div><strong>${escapeHtml(item.name)}</strong>${item.note ? `<p class="ticket-note">${escapeHtml(item.note)}</p>` : ""}</div></div><div class="ticket-item-controls"><select class="kitchen-state-select" aria-label="Estado de ${escapeHtml(item.name)}" data-action="item-status-select" data-table-id="${escapeHtml(table.id)}" data-item-id="${escapeHtml(item.id)}">${optionMarkup}</select><button class="kitchen-advance" type="button" title="${nextLabel}" aria-label="${nextLabel}" data-action="item-status" data-table-id="${escapeHtml(table.id)}" data-item-id="${escapeHtml(item.id)}" data-status="${nextStatus}">▶</button></div><div class="ticket-item-priority">${priorityToggle}</div></article>`;
+      return `<article class="ticket-item ${item.priority ? "ticket-priority" : ""}"><div class="ticket-product"><span class="ticket-item-quantity">${item.quantity}</span><div><strong>${escapeHtml(item.name)}</strong>${modifierLines.length ? `<p class="ticket-modifiers">${modifierLines.join("<br>")}</p>` : ""}${item.note ? `<p class="ticket-note">${escapeHtml(item.note)}</p>` : ""}</div></div><div class="ticket-item-controls"><select class="kitchen-state-select" aria-label="Estado de ${escapeHtml(item.name)}" data-action="item-status-select" data-table-id="${escapeHtml(table.id)}" data-item-id="${escapeHtml(item.id)}">${optionMarkup}</select><button class="kitchen-advance" type="button" title="${nextLabel}" aria-label="${nextLabel}" data-action="item-status" data-table-id="${escapeHtml(table.id)}" data-item-id="${escapeHtml(item.id)}" data-status="${nextStatus}">▶</button></div><div class="ticket-item-priority">${priorityToggle}</div></article>`;
     }).join("");
     return `<section class="kitchen-ticket"><header class="ticket-head ${timing.className}"><div class="ticket-heading-main"><div class="ticket-heading-top"><span class="ticket-sent-time">${kitchenSentTime(oldestItem.sent_at)}</span><span class="kitchen-timer" role="timer" aria-label="Pedido hace ${timing.minutes} minutos: ${timing.label}"><strong>${timing.minutes} min</strong></span></div><h2>${escapeHtml(table.name)}</h2><p>Principal · Atiende ${escapeHtml(table.opened_by)}</p></div><span class="status open">${items.length} prod.</span></header><div class="ticket-items">${renderedItems}</div><footer class="ticket-footer"><span class="ticket-footer-meta">${items.length} pendientes</span><button class="button button-finish-all" data-action="finish-ticket" data-table-id="${escapeHtml(table.id)}">Terminar todo</button></footer></section>`;
   }).join("");

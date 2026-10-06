@@ -146,7 +146,8 @@ h1, h2, h3 { font-family: 'Manrope', 'Avenir Next', sans-serif; }
 .kitchen-timer.ticket-very-late, .legend-very-late { color: #ffb07a; background: #40210d; }
 .ticket-cancel-risk { border-left-color: #ff5c4d; background: #2e120f; color: #ff8f85; }
 .kitchen-timer.ticket-cancel-risk, .legend-cancel-risk { color: #ff8f85; background: #421812; }
-.ticket-note { overflow-wrap: anywhere; margin: 3px 0 0; color: var(--muted); font-size: 10px; font-weight: 600; }
+.ticket-modifiers { overflow-wrap: anywhere; margin: 5px 0 0; padding: 5px 8px; border-left: 3px solid var(--green); border-radius: 4px; color: #8ef0c4; background: rgba(55,211,147,.12); font-size: 11px; font-weight: 700; line-height: 1.5; }
+.ticket-note { overflow-wrap: anywhere; margin: 5px 0 0; padding: 5px 8px; border-left: 3px solid var(--yellow); border-radius: 4px; color: #ffe9b0; background: rgba(245,195,79,.10); font-size: 11px; font-weight: 700; line-height: 1.5; }
 .ticket-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 4px; margin: 0; }
 .ticket-actions .button { min-height: 27px; padding: 0 7px; font-size: 10px; }
 .ticket-footer { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 9px 11px; }
