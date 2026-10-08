@@ -47,6 +47,74 @@ class ComandaWorkflowTests(unittest.TestCase):
         self.assertEqual(cleaned.status_code, 200)
         self.assertEqual(cleaned.json["tables"][0]["status"], "free")
 
+    def test_sent_item_can_be_edited_without_leaving_the_kitchen_queue(self):
+        self.action("table_open", table_id="1", waiter="Prueba")
+        self.action("item_add", table_id="1", menu_id="menu-te", quantity=1, note="Con azúcar")
+        sent = self.action("order_send", table_id="1")
+        item = sent.json["tables"][0]["items"][0]
+
+        edited = self.action(
+            "item_edit",
+            table_id="1",
+            item_id=item["id"],
+            menu_id="menu-te",
+            quantity=2,
+            modifiers=[],
+            note="Sin azúcar",
+            priority=True,
+            waiter="Prueba",
+        )
+
+        self.assertEqual(edited.status_code, 200)
+        updated_item = edited.json["tables"][0]["items"][0]
+        self.assertEqual(updated_item["status"], "sent")
+        self.assertEqual(updated_item["quantity"], 2)
+        self.assertEqual(updated_item["note"], "Sin azúcar")
+        self.assertTrue(updated_item["priority"])
+        self.assertEqual(updated_item["price"], 2000)
+
+    def test_canceled_items_are_excluded_from_payment_and_sales(self):
+        self.action("table_open", table_id="1", waiter="Prueba")
+        self.action("item_add", table_id="1", menu_id="menu-te", quantity=1)
+        self.action("item_add", table_id="1", menu_id="menu-cafe", quantity=2)
+        sent = self.action("order_send", table_id="1")
+        items = sent.json["tables"][0]["items"]
+
+        canceled = self.action("item_status", table_id="1", item_id=items[0]["id"], status="canceled")
+        self.assertEqual(canceled.status_code, 200)
+        paid_early = self.action("table_paid", table_id="1")
+        self.assertEqual(paid_early.status_code, 400)
+
+        ready = self.action("item_status", table_id="1", item_id=items[1]["id"], status="ready")
+        self.assertEqual(ready.status_code, 200)
+        paid = self.action("table_paid", table_id="1")
+
+        self.assertEqual(paid.status_code, 200)
+        self.assertEqual(paid.json["pending_sales"], [{"name": "Café", "quantity": 2}])
+
+    def test_table_with_only_canceled_items_cannot_be_paid(self):
+        self.action("table_open", table_id="1", waiter="Prueba")
+        added = self.action("item_add", table_id="1", menu_id="menu-te", quantity=1)
+        item_id = added.json["tables"][0]["items"][0]["id"]
+        self.action("item_status", table_id="1", item_id=item_id, status="canceled")
+
+        paid = self.action("table_paid", table_id="1")
+
+        self.assertEqual(paid.status_code, 400)
+        self.assertEqual(paid.json["error"], "No hay productos activos para cobrar.")
+
+    def test_canceled_item_can_be_reactivated_as_draft(self):
+        self.action("table_open", table_id="1", waiter="Prueba")
+        added = self.action("item_add", table_id="1", menu_id="menu-te", quantity=1)
+        item_id = added.json["tables"][0]["items"][0]["id"]
+        self.action("order_send", table_id="1")
+        self.action("item_status", table_id="1", item_id=item_id, status="canceled")
+
+        reactivated = self.action("item_status", table_id="1", item_id=item_id, status="draft")
+
+        self.assertEqual(reactivated.status_code, 200)
+        self.assertEqual(reactivated.json["tables"][0]["items"][0]["status"], "draft")
+
     def test_menu_import_merges_duplicate_products(self):
         initial_count = len(app.read_state()[0]["menu"])
 

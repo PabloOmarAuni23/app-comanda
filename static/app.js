@@ -34,7 +34,7 @@ function money(value) {
 }
 
 function tableTotal(table) {
-  return table.items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  return table.items.reduce((sum, item) => sum + (item.status === "canceled" ? 0 : item.price * item.quantity), 0);
 }
 
 function itemModifierParts(item) {
@@ -299,12 +299,23 @@ function renderTableDetail() {
   const dishes = state.menu.filter((dish) => dish.available && (activeCategory === "Todas" || dish.category === activeCategory));
   const categoryButtons = categories.map((category) => `<button class="category-button ${category === activeCategory ? "active" : ""}" data-category="${escapeHtml(category)}">${escapeHtml(category)}</button>`).join("");
   const products = dishes.map((dish) => `<button class="product-button" data-add-product="${escapeHtml(dish.id)}"><strong>${escapeHtml(dish.name)}</strong><span>${escapeHtml(dish.description || dish.category)}</span><b>${money(dish.price)}</b></button>`).join("");
-  const orderRows = table.items.length ? table.items.map((item) => `<div class="order-row ${item.status === "ready" ? "ready-order" : ""}"><div><div class="order-name">${item.quantity} × ${escapeHtml(item.name)}</div>${itemModifierSummary(item) ? `<div class="order-note">${itemModifierSummary(item)}</div>` : ""}${item.note ? `<div class="order-note">${escapeHtml(item.note)}</div>` : ""}<div class="order-meta">${item.status === "draft" ? `Agregado por ${escapeHtml(item.added_by)}` : `Tomado por ${escapeHtml(item.added_by)}`}</div></div><span class="status ${item.status}">${item.status === "ready" ? "Listo para retirar" : statusLabel(item.status)}</span><span class="order-price">${money(item.price * item.quantity)}</span></div>`).join("") : `<div class="empty-state"><div class="empty-mark">＋</div><h2>La mesa está abierta</h2><p>Agregá productos de la carta para empezar.</p></div>`;
-  const hasDraft = table.items.some((item) => item.status === "draft");
+  const orderRows = table.items.length ? table.items.map((item) => {
+    const canceled = item.status === "canceled";
+    const controls = canceled
+      ? `<button class="button button-secondary button-small" data-action="item-cancel" data-table-id="${escapeHtml(table.id)}" data-item-id="${escapeHtml(item.id)}">Reactivar</button>`
+      : `<button class="button button-secondary button-small" data-action="item-edit" data-table-id="${escapeHtml(table.id)}" data-item-id="${escapeHtml(item.id)}">Editar</button><button class="button button-danger button-small" data-action="item-cancel" data-table-id="${escapeHtml(table.id)}" data-item-id="${escapeHtml(item.id)}">Cancelar</button>`;
+    return `<div class="order-row ${item.status === "ready" ? "ready-order" : ""} ${canceled ? "canceled-order" : ""}"><div><div class="order-name">${item.quantity} × ${escapeHtml(item.name)}</div>${itemModifierSummary(item) ? `<div class="order-note">${itemModifierSummary(item)}</div>` : ""}${item.note ? `<div class="order-note">${escapeHtml(item.note)}</div>` : ""}<div class="order-meta">${item.status === "draft" ? `Agregado por ${escapeHtml(item.added_by)}` : `Tomado por ${escapeHtml(item.added_by)}`}</div><div class="order-controls">${controls}</div></div><span class="status ${item.status}">${item.status === "ready" ? "Listo para retirar" : statusLabel(item.status)}</span><span class="order-price">${money(canceled ? 0 : item.price * item.quantity)}</span></div>`;
+  }).join("") : `<div class="empty-state"><div class="empty-mark">＋</div><h2>La mesa está abierta</h2><p>Agregá productos de la carta para empezar.</p></div>`;
+  const billableItems = table.items.filter((item) => item.status !== "canceled");
+  const hasDraft = billableItems.some((item) => item.status === "draft");
   const sendButton = hasDraft ? `<button class="button button-primary" data-action="send-order" data-table-id="${escapeHtml(table.id)}">Enviar a cocina</button>` : "";
-  const canPay = table.items.length > 0 && !hasDraft && table.items.every((item) => item.status === "ready");
+  const canPay = billableItems.length > 0 && !hasDraft && billableItems.every((item) => item.status === "ready");
   const payButton = canPay ? `<button class="button button-secondary" data-action="pay-table" data-table-id="${escapeHtml(table.id)}">Cobrar ${money(tableTotal(table))}</button>` : "";
-  const disabledPayMessage = table.items.length && !canPay ? `<p class="order-meta">${hasDraft ? "Enviá los productos nuevos a cocina para cobrar." : "Podés cobrar cuando todos los productos estén listos."}</p>` : "";
+  const disabledPayMessage = !billableItems.length && table.items.length
+    ? `<p class="order-meta">No hay productos activos para cobrar. Podés reactivar un producto cancelado.</p>`
+    : billableItems.length && !canPay
+      ? `<p class="order-meta">${hasDraft ? "Enviá los productos nuevos a cocina para cobrar." : "Podés cobrar cuando todos los productos estén listos."}</p>`
+      : "";
   appRoot.innerHTML = `${pageHeading("Pedido de mesa", table.name, `Abierta por ${escapeHtml(table.opened_by)}${guestsSuffix(table)} · Total ${money(tableTotal(table))}`, `<button class="button button-secondary" data-go="tables">← Mesas</button>`)}
     <section class="section-panel"><div class="section-title"><h2>Carta</h2><button class="text-button" data-go="menu">Editar carta →</button></div><div class="category-row">${categoryButtons}</div><div class="product-grid">${products || `<div class="empty-state">No hay productos en esta categoría.</div>`}</div></section>
     <section class="table-section section-panel"><div class="section-title"><h2>Pedido <span class="order-meta">${table.items.length} productos</span></h2><strong>${money(tableTotal(table))}</strong></div><div class="order-list">${orderRows}</div><div class="dialog-actions">${disabledPayMessage}${sendButton}${payButton}</div></section>`;
@@ -361,7 +372,14 @@ function renderKitchen() {
           : "Retirar";
       const retrieveDisabledAttr = item.status === "ready" && item.retrieved_at ? "disabled" : "";
       const priorityToggle = `<label class="priority-toggle"><input type="checkbox" data-action="item-priority" data-table-id="${escapeHtml(table.id)}" data-item-id="${escapeHtml(item.id)}" ${item.priority ? "checked" : ""}><span>Prioridad</span></label>`;
-      return `<article class="ticket-item ${item.priority ? "ticket-priority" : ""}"><div class="ticket-product"><span class="ticket-item-quantity">${item.quantity}</span><div><strong>${escapeHtml(item.name)}</strong>${modifierLines.length ? `<p class="ticket-modifiers">${modifierLines.join("<br>")}</p>` : ""}${item.note ? `<p class="ticket-note">${escapeHtml(item.note)}</p>` : ""}</div></div><div class="ticket-item-controls"><select class="kitchen-state-select" aria-label="Estado de ${escapeHtml(item.name)}" data-action="item-status-select" data-table-id="${escapeHtml(table.id)}" data-item-id="${escapeHtml(item.id)}">${optionMarkup}</select><button class="kitchen-advance" type="button" title="${nextLabel}" aria-label="${nextLabel}" data-action="item-status" data-table-id="${escapeHtml(table.id)}" data-item-id="${escapeHtml(item.id)}" data-status="${nextStatus}">▶</button><button class="kitchen-advance kitchen-retrieve" type="button" title="${retrieveLabel}" aria-label="${retrieveLabel}" data-action="order-retrieve" data-table-id="${escapeHtml(table.id)}" data-item-id="${escapeHtml(item.id)}" ${retrieveDisabledAttr ? "disabled" : ""}>${retrieveLabel}</button></div><div class="ticket-item-priority">${priorityToggle}</div></article>`;
+      const isCanceled = item.status === "canceled";
+      const hasEditableControls = !isCanceled && (item.status === "sent" || item.status === "preparing" || item.status === "suspended" || item.status === "ready");
+      const editButton = `<button class="kitchen-advance" type="button" title="Editar pedido" aria-label="Editar ${escapeHtml(item.name)}" data-action="item-edit" data-table-id="${escapeHtml(table.id)}" data-item-id="${escapeHtml(item.id)}">✎</button>`;
+      const cancelButton = `<button class="kitchen-advance kitchen-cancel" type="button" title="Cancelar pedido" aria-label="Cancelar ${escapeHtml(item.name)}" data-action="item-cancel" data-table-id="${escapeHtml(table.id)}" data-item-id="${escapeHtml(item.id)}">✕</button>`;
+      const statusControls = isCanceled
+        ? `<span class="status canceled">Cancelado</span>`
+        : `<select class="kitchen-state-select" aria-label="Estado de ${escapeHtml(item.name)}" data-action="item-status-select" data-table-id="${escapeHtml(table.id)}" data-item-id="${escapeHtml(item.id)}">${optionMarkup}</select><button class="kitchen-advance" type="button" title="${nextLabel}" aria-label="${nextLabel}" data-action="item-status" data-table-id="${escapeHtml(table.id)}" data-item-id="${escapeHtml(item.id)}" data-status="${nextStatus}">▶</button><button class="kitchen-advance kitchen-retrieve" type="button" title="${retrieveLabel}" aria-label="${retrieveLabel}" data-action="order-retrieve" data-table-id="${escapeHtml(table.id)}" data-item-id="${escapeHtml(item.id)}" ${retrieveDisabledAttr ? "disabled" : ""}>${retrieveLabel}</button>`;
+      return `<article class="ticket-item ${item.priority ? "ticket-priority" : ""} ${isCanceled ? "ticket-canceled" : ""}"><div class="ticket-product"><span class="ticket-item-quantity">${item.quantity}</span><div><strong>${escapeHtml(item.name)}</strong>${modifierLines.length ? `<p class="ticket-modifiers">${modifierLines.join("<br>")}</p>` : ""}${item.note ? `<p class="ticket-note">${escapeHtml(item.note)}</p>` : ""}</div></div><div class="ticket-item-controls">${isCanceled ? `<span class="status canceled">Cancelado</span>` : statusControls}</div><div class="ticket-item-priority">${isCanceled ? "" : priorityToggle}</div>${hasEditableControls ? editButton : ""}${hasEditableControls ? cancelButton : ""}</article>`;
     }).join("");
     return `<section class="kitchen-ticket"><header class="ticket-head ${timing.className}"><div class="ticket-heading-main"><div class="ticket-heading-top"><span class="ticket-sent-time">${kitchenSentTime(oldestItem.sent_at)}</span><span class="kitchen-timer" role="timer" aria-label="Pedido hace ${timing.minutes} minutos: ${timing.label}"><strong>${timing.minutes} min</strong></span></div><h2>${escapeHtml(table.name)}</h2><p>Principal · Atiende ${escapeHtml(table.opened_by)}${guestsSuffix(table)}</p></div><span class="status open">${items.length} prod.</span></header><div class="ticket-items">${renderedItems}</div><footer class="ticket-footer"><span class="ticket-footer-meta">${items.length} pendientes</span><button class="button button-finish-all" data-action="finish-ticket" data-table-id="${escapeHtml(table.id)}">Terminar todo</button></footer></section>`;
   }).join("");
@@ -523,8 +541,9 @@ function showProductDialog(dish = null) {
   });
 }
 
-function showAddItemDialog(table, dish) {
+function showAddItemDialog(table, dish, item = null) {
   const groups = dish.modifier_groups || [];
+  const selectedModifiers = item?.modifiers || [];
   const modifierFields = groups.map((group, groupIndex) => {
     const condition = group.show_when || null;
     const wrapperAttributes = `data-modifier-wrapper data-modifier-group-name="${escapeHtml(group.name)}"${condition ? ` data-conditional-group data-when-group="${escapeHtml(condition.group)}" data-when-options="${escapeHtml(JSON.stringify(condition.options || []))}"` : ""}`;
@@ -532,17 +551,19 @@ function showAddItemDialog(table, dish) {
     const options = group.options.map((option, optionIndex) => {
       const surcharge = option.price ? ` · +${money(option.price)}` : " · incluido";
       return group.selection === "single"
-        ? `<option value="${escapeHtml(option.name)}">${escapeHtml(option.name)}${surcharge}</option>`
-        : `<div class="modifier-quantity-row"><span>${escapeHtml(option.name)}${surcharge}</span><div class="quantity-stepper modifier-stepper"><button class="quantity-step" type="button" data-quantity-step="-1" aria-label="Disminuir ${escapeHtml(option.name)}">−</button><input name="modifier-${groupIndex}-${optionIndex}" data-quantity-choice="${escapeHtml(option.name)}" type="number" min="0" max="99" value="0" inputmode="none" readonly aria-label="Cantidad de ${escapeHtml(option.name)}"><button class="quantity-step" type="button" data-quantity-step="1" aria-label="Aumentar ${escapeHtml(option.name)}">+</button></div></div>`;
+        ? `<option value="${escapeHtml(option.name)}" ${selectedModifiers.some((modifier) => modifier.group === group.name && modifier.name === option.name) ? "selected" : ""}>${escapeHtml(option.name)}${surcharge}</option>`
+        : `<div class="modifier-quantity-row"><span>${escapeHtml(option.name)}${surcharge}</span><div class="quantity-stepper modifier-stepper"><button class="quantity-step" type="button" data-quantity-step="-1" aria-label="Disminuir ${escapeHtml(option.name)}">−</button><input name="modifier-${groupIndex}-${optionIndex}" data-quantity-choice="${escapeHtml(option.name)}" type="number" min="0" max="99" value="${selectedModifiers.find((modifier) => modifier.group === group.name && modifier.name === option.name)?.quantity || 0}" inputmode="none" readonly aria-label="Cantidad de ${escapeHtml(option.name)}"><button class="quantity-step" type="button" data-quantity-step="1" aria-label="Aumentar ${escapeHtml(option.name)}">+</button></div></div>`;
     }).join("");
     return group.selection === "single"
       ? `<label class="dialog-field modifier-selection" ${wrapperAttributes}>${escapeHtml(group.name)}${group.required ? " · obligatorio" : ""}${conditionHint}<select name="modifier-group-${groupIndex}" data-single-choice ${group.required ? 'data-required="true" required' : ""}><option value="">${group.required ? "Elegí una opción" : "Sin selección"}</option>${options}</select></label>`
       : `<fieldset class="modifier-selection" ${wrapperAttributes}><legend>${escapeHtml(group.name)}${group.required ? " · elegí al menos una" : ""}</legend>${conditionHint}${options}</fieldset>`;
   }).join("");
-  const body = `<div class="dialog-product-line"><strong>${escapeHtml(dish.name)}</strong><span>${money(dish.price)}</span></div><p class="dialog-hint">Se agrega de a 1 plato por vez · repetí el producto si querés pedir más de uno.</p>${modifierFields}<label class="priority-field"><input name="priority" type="checkbox"><span>Prioridad</span><small>Producto rápido de preparar</small></label><label class="dialog-field">Nota para cocina<textarea name="note" maxlength="160" placeholder="Ej.: sin azúcar, bien tostado"></textarea></label>`;
-  showDialog({ eyebrow: table.name, title: "Agregar al pedido", body, submitLabel: "Agregar", onSubmit: (data) => {
+  const quantityField = item ? `<label class="dialog-field">Cantidad<div class="quantity-stepper"><button class="quantity-step" type="button" data-quantity-step="-1" aria-label="Menos">−</button><input name="quantity" type="number" min="1" max="99" value="${item.quantity}" required><button class="quantity-step" type="button" data-quantity-step="1" aria-label="Más">＋</button></div></label>` : "";
+  const body = `<div class="dialog-product-line"><strong>${escapeHtml(dish.name)}</strong><span>${money(dish.price)}</span></div>${quantityField}<p class="dialog-hint">${item ? "Los cambios se actualizarán también en cocina." : "Se agrega de a 1 plato por vez · repetí el producto si querés pedir más de uno."}</p>${modifierFields}<label class="priority-field"><input name="priority" type="checkbox" ${item?.priority ? "checked" : ""}><span>Prioridad</span><small>Producto rápido de preparar</small></label><label class="dialog-field">Nota para cocina<textarea name="note" maxlength="160" placeholder="Ej.: sin azúcar, bien tostado">${escapeHtml(item?.note || "")}</textarea></label>`;
+  showDialog({ eyebrow: table.name, title: item ? "Editar pedido" : "Agregar al pedido", body, submitLabel: item ? "Guardar cambios" : "Agregar", onSubmit: (data) => {
     const wrappers = [...dialogBody.querySelectorAll("[data-modifier-wrapper]")];
     const modifiers = [];
+    let missingRequiredGroup = "";
     groups.forEach((group, groupIndex) => {
       if (wrappers[groupIndex]?.hidden) return;
       if (group.selection === "single") {
@@ -560,11 +581,14 @@ function showAddItemDialog(table, dish) {
       });
       if (group.required && selectedCount === 0) {
         showToast(`Elegí al menos una opción para ${group.name}.`, true);
-        return;
+        missingRequiredGroup = group.name;
       }
     });
-    if (groups.some((group, groupIndex) => !wrappers[groupIndex]?.hidden && group.selection === "quantity" && group.required && !modifiers.some((modifier) => modifier.group === group.name))) return false;
-    return sendAction({ type: "item_add", table_id: table.id, menu_id: dish.id, quantity: 1, modifiers, note: data.note, priority: data.priority === "on", waiter: waiterInput.value.trim() || table.opened_by }, `${dish.name} agregado.`);
+    if (missingRequiredGroup) return false;
+    const action = item
+      ? { type: "item_edit", table_id: table.id, item_id: item.id, menu_id: dish.id, quantity: Number(data.quantity), modifiers, note: data.note, priority: data.priority === "on", waiter: waiterInput.value.trim() || table.opened_by }
+      : { type: "item_add", table_id: table.id, menu_id: dish.id, quantity: 1, modifiers, note: data.note, priority: data.priority === "on", waiter: waiterInput.value.trim() || table.opened_by };
+    return sendAction(action, item ? `${dish.name} actualizado en cocina.` : `${dish.name} agregado.`);
   } });
   syncConditionalModifierGroups();
 }
@@ -623,6 +647,30 @@ function syncConditionalModifierGroups() {
     wrapper.querySelectorAll("[data-quantity-choice]").forEach((input) => { input.value = "0"; });
   });
 }
+
+function openItemEditDialog(tableId, itemId) {
+  const table = state.tables.find((entry) => entry.id === tableId);
+  const item = table?.items.find((child) => child.id === itemId);
+  if (!item || !table) {
+    showToast("No se encontró ese producto.", true);
+    return;
+  }
+  const menuItem = state.menu.find((entry) => entry.id === item.menu_id);
+  if (!menuItem) {
+    showToast("El producto ya no está disponible.", true);
+    return;
+  }
+  showAddItemDialog(table, menuItem, item);
+}
+
+function closeItemEditDialog() {
+  dialog.close();
+  dialogBody.innerHTML = "";
+}
+
+const originalShowDialogBody = dialogBody;
+const originalShowDialogForm = dialogForm;
+const originalShowDialogActions = dialogActions;
 
 function setView(view) {
   if (!currentRole) return;
@@ -716,7 +764,20 @@ appRoot.addEventListener("click", async (event) => {
     const reportTable = state.tables.find((entry) => entry.id === tableId);
     if (reportTable) downloadTableReport(reportTable);
   }
-  if (actionButton.dataset.action === "item-status") {
+  if (actionButton.dataset.action === "item-cancel") {
+    const item = state.tables.find((entry) => entry.id === tableId)?.items.find((child) => child.id === actionButton.dataset.itemId);
+    if (!item) {
+      showToast("No se encontró ese producto.", true);
+      return;
+    }
+    const confirmMessage = item.status === "canceled" ? "¿Reactivar este producto cancelado y devolverlo a cocina?" : `¿Cancelar este pedido? Se perderán los datos de la cocina actuales.`;
+    if (!window.confirm(confirmMessage)) return;
+    const nextStatus = item.status === "canceled" ? "draft" : "canceled";
+    await sendAction({ type: "item_status", table_id: tableId, item_id: actionButton.dataset.itemId, status: nextStatus });
+  }
+  if (actionButton.dataset.action === "item-edit") {
+    openItemEditDialog(tableId, actionButton.dataset.itemId);
+  }  if (actionButton.dataset.action === "item-status") {
     await sendAction({ type: "item_status", table_id: tableId, item_id: actionButton.dataset.itemId, status: actionButton.dataset.status });
   }
   if (actionButton.dataset.action === "order-retrieve") {
@@ -738,7 +799,7 @@ appRoot.addEventListener("click", async (event) => {
   }
   if (actionButton.dataset.action === "finish-ticket") {
     const table = state.tables.find((entry) => entry.id === tableId);
-    const pendingItems = table?.items.filter((item) => ["sent", "preparing", "suspended"].includes(item.status)) || [];
+    const pendingItems = table?.items.filter((item) => ["sent", "preparing", "suspended"].includes(item.status) && item.status !== "canceled") || [];
     for (const item of pendingItems) {
       const completed = await sendAction({ type: "item_status", table_id: tableId, item_id: item.id, status: "ready" });
       if (!completed) break;

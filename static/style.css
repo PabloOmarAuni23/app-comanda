@@ -92,11 +92,16 @@ h1, h2, h3 { font-family: 'Manrope', 'Avenir Next', sans-serif; }
 .status.cleaning, .status.suspended { color: #ffd166; background: #33270a; }
 .status.ready { color: #6ee7a8; background: #10261d; }
 .status.preparing { color: #ff9f8f; background: var(--red-soft); }
+.status.canceled { color: var(--red); background: var(--red-soft); }
 .table-section { margin: 27px 0 0; }
 .table-section h2 { margin: 0 0 13px; font-size: 16px; }
 .order-list { display: grid; gap: 9px; }
 .order-row { display: grid; grid-template-columns: 1fr auto auto; align-items: center; gap: 14px; padding: 13px 15px; border-bottom: 1px solid var(--line); }
 .order-row:last-child { border-bottom: 0; }
+.order-row.canceled-order { opacity: .68; }
+.order-row.canceled-order .order-name { text-decoration: line-through; }
+.order-controls { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.order-controls .button { min-height: 30px; }
 .order-name { font-weight: 700; font-size: 13px; }
 .order-note, .order-meta { color: var(--muted); font-size: 11px; }
 .order-note { margin-top: 4px; }
@@ -353,5 +358,3 @@ h1, h2, h3 { font-family: 'Manrope', 'Avenir Next', sans-serif; }
 @media (max-width: 540px) { .role-grid { grid-template-columns: 1fr; } }
 
 .page-heading-buttons { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-start; }
-
-

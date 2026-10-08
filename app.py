@@ -430,14 +430,58 @@ def mutate_state(action):
             current_status = str(item["status"]) if item is not None else ""
             status = str(action.get("status", ""))
             allowed_status = {
-                "sent": {"preparing", "ready", "suspended"},
-                "preparing": {"ready", "suspended"},
-                "suspended": {"preparing", "ready"},
-                "ready": {"ready"},
+                "sent": {"preparing", "ready", "suspended", "draft", "canceled"},
+                "preparing": {"ready", "suspended", "draft", "canceled"},
+                "suspended": {"preparing", "ready", "draft", "canceled"},
+                "ready": {"ready", "draft", "canceled"},
+                "draft": {"draft", "canceled"},
+                "canceled": {"draft"},
             }
-            if item is None or status not in {"preparing", "ready", "suspended"} or status not in allowed_status.get(current_status, set()):
+            if item is None or status not in allowed_status.get(current_status, set()):
                 raise ValueError("No se pudo actualizar el producto.")
             item["status"] = status
+        elif action_type == "item_edit":
+            table = find_table()
+            item = next((entry for entry in table["items"] if entry["id"] == str(action.get("item_id", ""))), None)
+            if item is None:
+                raise ValueError("No se encontró ese producto.")
+            if item["status"] == "canceled":
+                raise ValueError("No se puede editar un producto cancelado.")
+            if table["status"] != "open":
+                raise ValueError("La mesa no está abierta para editar el pedido.")
+            menu_item = next((entry for entry in menu if entry["id"] == str(action.get("menu_id", "")) and entry["available"]), None)
+            if menu_item is None:
+                raise ValueError("Ese producto ya no está disponible en la carta.")
+            if item["menu_id"] != menu_item["id"]:
+                raise ValueError("El producto no corresponde a la carta seleccionada.")
+            try:
+                quantity = max(1, min(int(action.get("quantity", item["quantity"])), 99))
+            except (TypeError, ValueError):
+                raise ValueError("La cantidad tiene que ser un número entero entre 1 y 99.")
+            if "modifiers" in action:
+                if not isinstance(action["modifiers"], list) or len(action["modifiers"]) > 10:
+                    raise ValueError("Revisá el número de opciones del pedido.")
+                try:
+                    edited_modifiers = select_modifiers(menu_item, action["modifiers"])
+                except ValueError as error:
+                    raise ValueError(str(error)) from error
+                unit_price = menu_item["price"] + sum(entry["unit_price"] * entry["quantity"] for entry in edited_modifiers)
+                if len(edited_modifiers) != len(item["modifiers"]):
+                    item["edited_by"] = str(action.get("waiter", "Equipo")).strip()[:40] or "Equipo"
+                    item["edited_at"] = stamp
+                item["modifiers"] = edited_modifiers
+            else:
+                edited_modifiers = item["modifiers"]
+                unit_price = item["price"]
+            item["quantity"] = quantity
+            if "note" in action:
+                item["note"] = str(action.get("note", "")).strip()[:160]
+            if "priority" in action:
+                item["priority"] = action.get("priority") is True
+            item["price"] = unit_price
+            item["edited_by"] = str(action.get("waiter", "Equipo")).strip()[:40] or "Equipo"
+            item["edited_at"] = stamp
+
         elif action_type == "item_priority":
             table = find_table()
             item = next((entry for entry in table["items"] if entry["id"] == str(action.get("item_id", ""))), None)
@@ -448,9 +492,12 @@ def mutate_state(action):
             table = find_table()
             if table["status"] != "open":
                 raise ValueError("La mesa no se puede cobrar en este estado.")
-            if not table["items"] or any(item["status"] != "ready" for item in table["items"]):
+            billable_items = [item for item in table["items"] if item["status"] != "canceled"]
+            if not billable_items:
+                raise ValueError("No hay productos activos para cobrar.")
+            if any(item["status"] != "ready" for item in billable_items):
                 raise ValueError("Esperá a que todos los productos estén listos antes de cobrar.")
-            for item in table["items"]:
+            for item in billable_items:
                 name = str(item.get("name", "")).strip()
                 quantity = int(item.get("quantity", 0) or 0)
                 if not name or quantity <= 0:
