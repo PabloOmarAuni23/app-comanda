@@ -416,14 +416,23 @@ def mutate_state(action):
             if not pending:
                 raise ValueError("No hay productos nuevos para enviar.")
             for item in pending:
-                item.update(status="sent", sent_at=stamp)
+                item.update(status="sent", sent_at=stamp, ready_at=None, retrieved_at=None, retrieved_by=None)
         elif action_type == "order_retrieve":
             table = find_table()
             item = next((entry for entry in table["items"] if entry["id"] == str(action.get("item_id", ""))), None)
             if item is None or item["status"] not in {"sent", "preparing"}:
                 raise ValueError("No se encontró el producto o no está en cola de cocina.")
             item["status"] = "ready"
+            item["ready_at"] = stamp
+            item.pop("retrieved_at", None)
+            item.pop("retrieved_by", None)
+        elif action_type == "item_mark_retrieved":
+            table = find_table()
+            item = next((entry for entry in table["items"] if entry["id"] == str(action.get("item_id", ""))), None)
+            if table["status"] != "open" or item is None or item["status"] != "ready" or item.get("retrieved_at"):
+                raise ValueError("Solo se puede marcar como retirado un producto listo que todavía espera retiro.")
             item["retrieved_at"] = stamp
+            item["retrieved_by"] = str(action.get("waiter", "Equipo")).strip()[:40] or "Equipo"
         elif action_type == "item_status":
             table = find_table()
             item = next((entry for entry in table["items"] if entry["id"] == str(action.get("item_id", ""))), None)
@@ -440,6 +449,13 @@ def mutate_state(action):
             if item is None or status not in allowed_status.get(current_status, set()):
                 raise ValueError("No se pudo actualizar el producto.")
             item["status"] = status
+            if status == "ready":
+                item["ready_at"] = stamp
+                item.pop("retrieved_at", None)
+                item.pop("retrieved_by", None)
+            else:
+                item.pop("retrieved_at", None)
+                item.pop("retrieved_by", None)
         elif action_type == "item_edit":
             table = find_table()
             item = next((entry for entry in table["items"] if entry["id"] == str(action.get("item_id", ""))), None)

@@ -415,7 +415,7 @@ class ComandaWorkflowTests(unittest.TestCase):
         clamped_low = self.action("table_open", table_id="3", waiter="Prueba", guests=0)
         self.assertEqual(clamped_low.json["tables"][2]["guests"], 1)
 
-    def test_retrieve_item_marks_ready_and_records_retrieved_at(self):
+    def test_retrieve_item_marks_ready_without_claiming_waiter_picked_it_up(self):
         self.action("table_open", table_id="1", waiter="Prueba")
         self.action("item_add", table_id="1", menu_id="menu-te", quantity=1, waiter="Prueba")
         sent = self.action("order_send", table_id="1")
@@ -424,12 +424,52 @@ class ComandaWorkflowTests(unittest.TestCase):
 
         retrieve = self.action("order_retrieve", table_id="1", item_id=item_id)
         self.assertEqual(retrieve.status_code, 200)
-        self.assertEqual(retrieve.json["tables"][0]["items"][0]["status"], "ready")
-        self.assertIsNotNone(retrieve.json["tables"][0]["items"][0]["retrieved_at"])
+        item = retrieve.json["tables"][0]["items"][0]
+        self.assertEqual(item["status"], "ready")
+        self.assertIsNotNone(item["ready_at"])
+        self.assertNotIn("retrieved_at", item)
 
         paid = self.action("table_paid", table_id="1")
         self.assertEqual(paid.status_code, 200)
         self.assertEqual(paid.json["tables"][0]["status"], "cleaning")
+
+    def test_waiter_can_mark_ready_item_as_retrieved(self):
+        self.action("table_open", table_id="1", waiter="Prueba")
+        self.action("item_add", table_id="1", menu_id="menu-te", quantity=1)
+        sent = self.action("order_send", table_id="1")
+        item_id = sent.json["tables"][0]["items"][0]["id"]
+        ready = self.action("item_status", table_id="1", item_id=item_id, status="ready")
+        self.assertEqual(ready.status_code, 200)
+        self.assertNotIn("retrieved_at", ready.json["tables"][0]["items"][0])
+
+        retrieved = self.action("item_mark_retrieved", table_id="1", item_id=item_id, waiter="Ana")
+
+        self.assertEqual(retrieved.status_code, 200)
+        item = retrieved.json["tables"][0]["items"][0]
+        self.assertEqual(item["status"], "ready")
+        self.assertIsNotNone(item["retrieved_at"])
+        self.assertEqual(item["retrieved_by"], "Ana")
+
+    def test_waiter_cannot_mark_an_unready_item_as_retrieved(self):
+        self.action("table_open", table_id="1", waiter="Prueba")
+        added = self.action("item_add", table_id="1", menu_id="menu-te", quantity=1)
+        item_id = added.json["tables"][0]["items"][0]["id"]
+
+        response = self.action("item_mark_retrieved", table_id="1", item_id=item_id, waiter="Ana")
+
+        self.assertEqual(response.status_code, 400)
+
+    def test_item_cannot_be_marked_retrieved_twice(self):
+        self.action("table_open", table_id="1", waiter="Prueba")
+        self.action("item_add", table_id="1", menu_id="menu-te", quantity=1)
+        sent = self.action("order_send", table_id="1")
+        item_id = sent.json["tables"][0]["items"][0]["id"]
+        self.action("item_status", table_id="1", item_id=item_id, status="ready")
+        self.assertEqual(self.action("item_mark_retrieved", table_id="1", item_id=item_id).status_code, 200)
+
+        duplicate = self.action("item_mark_retrieved", table_id="1", item_id=item_id)
+
+        self.assertEqual(duplicate.status_code, 400)
 
     def test_retrieve_requires_existing_item_on_open_table(self):
         retrieved = self.action("order_retrieve", table_id="1", item_id="no-such-item")

@@ -50,3 +50,5 @@ Los precios de las opciones se configuran como recargos por unidad: dejalos en `
 Cada grupo puede marcarse como **condicional** con el campo *Mostrar cuando*: elegí el grupo que lo activa y, opcionalmente, solo algunas de sus opciones. El grupo condicional permanece oculto (y sin exigir sus opciones obligatorias) hasta que se marca la opción que lo activa; en ese momento se abre su lista de cantidades con los botones `−` / `+`. Por ejemplo, el combo **Clásico** muestra los **Acompañamientos** recién al elegir la infusión, y cada acompañamiento se suma con su propia cantidad (dos tortillas gruesas, una fina y una factura, etc.).
 
 Desde el detalle de la mesa, el mozo puede editar o cancelar productos ya enviados a cocina; los cambios se reflejan también en la comanda de cocina. Los productos cancelados no suman al total ni a las ventas y se pueden reactivar desde la mesa.
+
+Cuando cocina termina un producto, queda como **Listo para retirar** y aparece un aviso global y dentro del pedido de su mesa. Al llevarlo, el mozo marca **Retirado** en esa mesa; el aviso desaparece y queda registrado quién lo retiró y a qué hora.
