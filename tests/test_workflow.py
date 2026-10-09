@@ -1,3 +1,4 @@
+import os
 import tempfile
 import unittest
 from pathlib import Path
@@ -723,3 +724,33 @@ class SiteMenuTests(unittest.TestCase):
         again = self.client.post("/api/action", json={"type": "menu_add", "name": "Nuevo", "category": "X", "price": 100})
         self.assertEqual(len(again.json["menu"]), 38)
         self.assertEqual(len(self.menu()), 38)
+
+
+@unittest.skipUnless(os.environ.get("TEST_DATABASE_URL"), "Definí TEST_DATABASE_URL para probar PostgreSQL")
+class PostgresStorageTests(unittest.TestCase):
+    def setUp(self):
+        self.environment_patch = patch.dict(os.environ, {"DATABASE_URL": os.environ["TEST_DATABASE_URL"]})
+        self.environment_patch.start()
+        with app.closing(app.connect_db()) as connection, connection:
+            connection.execute("DROP TABLE IF EXISTS app_state")
+        app.initialize_db()
+        self.client = app.app.test_client()
+
+    def tearDown(self):
+        self.environment_patch.stop()
+
+    def test_changes_are_kept_between_connections(self):
+        self.assertEqual(self.client.post("/api/action", json={"type": "shift_start", "shift": "morning"}).status_code, 200)
+        created = self.client.post("/api/action", json={"type": "menu_add", "name": "Plato nuevo", "category": "Extra", "price": 1234})
+        self.assertEqual(created.status_code, 200)
+
+        state = self.client.get("/api/state").json
+        self.assertEqual(state["shift"]["type"], "morning")
+        self.assertTrue(any(dish["name"] == "Plato nuevo" for dish in state["menu"]))
+        self.assertEqual(len(state["menu"]), 38)
+        self.assertFalse(state["storage_volatile"])
+
+    def test_failed_action_does_not_change_the_stored_state(self):
+        failed = self.client.post("/api/action", json={"type": "table_open", "table_id": "1", "waiter": "Ana"})
+        self.assertEqual(failed.status_code, 400)
+        self.assertTrue(all(table["status"] == "free" for table in self.client.get("/api/state").json["tables"]))

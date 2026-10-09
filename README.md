@@ -25,7 +25,18 @@ La base local se crea en `instance/comanda.sqlite3`. Para probar desde otro tel�
 3. Verificar que Render muestre el plan **Free ($0)** antes de crear el servicio. No elegir ni confirmar un plan pago.
 4. Compartir la URL HTTPS pública del servicio con el equipo. Desde esa URL, en el navegador del teléfono se puede elegir **Agregar a pantalla de inicio** o **Instalar aplicación**.
 
-Todos los teléfonos que abran la misma URL comparten el estado actual en el servidor. El plan gratuito duerme después de 15 minutos sin visitas y puede reiniciarse; al dormir, reiniciar o volver a desplegarse, Render borra los archivos locales. Por eso las mesas abiertas y los cambios manuales de la carta pueden perderse antes de limpiar la mesa. Al volver, el servidor carga la carta inicial y todas las mesas libres. La primera visita tras dormir puede tardar alrededor de un minuto.
+Todos los teléfonos que abran la misma URL comparten el estado actual en el servidor. **Atención:** el plan gratuito de Render duerme después de 15 minutos sin visitas y borra sus archivos locales cada vez que duerme, se reinicia o se vuelve a desplegar, así que sin base de datos se pierden la carta, las mesas y las ventas. La primera visita tras dormir puede tardar alrededor de un minuto.
+
+### Guardar los datos (gratis)
+
+La app guarda todo en PostgreSQL cuando existe la variable `DATABASE_URL`; sin ella usa un archivo SQLite local (que sirve en una PC, pero no en Render gratuito). Para que los datos queden guardados:
+
+1. Creá una cuenta gratuita en [Neon](https://neon.tech) (o [Supabase](https://supabase.com)) y un proyecto nuevo.
+2. Copiá la *connection string* (empieza con `postgresql://` y termina con `?sslmode=require`).
+3. En Render, abrí el servicio **app-comanda → Environment → Add Environment Variable**: nombre `DATABASE_URL`, valor la cadena copiada. Guardá; Render vuelve a desplegar solo.
+4. La primera vez la base está vacía y la app carga la carta inicial: volvé a hacer una sola vez los cambios de carta. Desde ahí todo (carta, mesas, pedidos, turnos y ventas) se conserva aunque Render se reinicie o se actualice.
+
+Mientras no esté configurada, la app muestra un aviso rojo en Inicio, Carta y Iniciar turno.
 
 Este modo evita el costo del disco persistente. Los cierres por turno guardan las unidades vendidas y permiten compartir el resumen por WhatsApp, pero tanto las ventas pendientes como el historial de cierres se guardan en el archivo local y pueden perderse si Render duerme, reinicia o vuelve a desplegarse. Para garantizar esa persistencia haría falta una base alojada aparte; no se configura aquí para mantener el costo en cero. Para garantizar esa persistencia haría falta una base alojada aparte; no se configura aquí para mantener el costo en cero.
 

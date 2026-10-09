@@ -168,6 +168,11 @@ async function sendAction(action, successMessage) {
   }
 }
 
+function volatileBanner() {
+  if (!state?.storage_volatile) return "";
+  return `<div class="storage-warning" role="alert"><strong>⚠ Los datos no se están guardando</strong><span>Este servidor gratuito borra la carta, las mesas y las ventas cada vez que se reinicia o se actualiza. Conectá una base de datos (ver README) para que queden guardados.</span></div>`;
+}
+
 function pageHeading(eyebrow, title, subtitle, button = "") {
   return `<div class="page-heading"><div><p class="eyebrow">${escapeHtml(eyebrow)}</p><h1>${escapeHtml(title)}</h1><p>${escapeHtml(subtitle)}</p></div>${button}</div>`;
 }
@@ -247,7 +252,7 @@ function renderShiftStart() {
   const lastText = last ? `Último cierre: turno ${SHIFT_LABELS[last.shift] || last.shift} · ${new Date(last.closed_at).toLocaleString("es-AR", { dateStyle: "short", timeStyle: "short" })}` : "Todavía no hay turnos cerrados.";
   const suggested = new Date().getHours() < 15 ? "morning" : "afternoon";
   const card = (shift, icon, title, hours) => `<button class="role-card ${shift === suggested ? "suggested" : ""}" type="button" data-action="shift-start" data-shift="${shift}"><span class="role-icon" aria-hidden="true">${icon}</span><strong>${title}</strong><span>${hours}</span></button>`;
-  appRoot.innerHTML = `<section class="role-screen"><div class="role-brand"><span class="brand-mark" aria-hidden="true">C</span><p class="eyebrow">Comanda del bar</p><h1>Iniciar turno</h1><p>Elegí el turno para abrir el negocio. Los datos se mantienen hasta que cierres el turno.</p></div><div class="role-grid">${card("morning", "☀", "Turno mañana", "Desayunos y meriendas")}${card("afternoon", "🌙", "Turno tarde", "Tarde y noche")}</div><p class="order-meta shift-last">${escapeHtml(lastText)}</p></section>`;
+  appRoot.innerHTML = `${volatileBanner()}<section class="role-screen"><div class="role-brand"><span class="brand-mark" aria-hidden="true">C</span><p class="eyebrow">Comanda del bar</p><h1>Iniciar turno</h1><p>Elegí el turno para abrir el negocio. Los datos se mantienen hasta que cierres el turno.</p></div><div class="role-grid">${card("morning", "☀", "Turno mañana", "Desayunos y meriendas")}${card("afternoon", "🌙", "Turno tarde", "Tarde y noche")}</div><p class="order-meta shift-last">${escapeHtml(lastText)}</p></section>`;
 }
 
 function applyRoleUi() {
@@ -308,7 +313,7 @@ function renderHome() {
   const formatTime = (timestamp) => new Intl.DateTimeFormat("es-AR", { hour: "2-digit", minute: "2-digit" }).format(new Date(timestamp));
   const closedRows = tickets.length ? tickets.slice().reverse().map((ticket) => `<div class="order-row"><span><span class="order-name">${escapeHtml(ticket.table_name)}</span><br><span class="order-meta">${plural(Number(ticket.units) || 0, "unidad", "unidades")} · ${formatTime(ticket.paid_at)}</span></span><span class="status ready">Cobrada</span><span class="order-price">${money(ticket.total)}</span></div>`).join("") : `<div class="activity-empty"><div class="empty-mark">$</div>Los cobros del turno van a aparecer acá.</div>`;
 
-  appRoot.innerHTML = `${pageHeading(`Turno ${SHIFT_LABELS[state.shift.type] || state.shift.type} · desde ${formatTimeOfDay(state.shift.started_at)}`, "Ventas del turno", `Total ${money(openTotal + closedTotal)} · cobrado y por cobrar, actualizado en todos los dispositivos.`, `<div class="page-heading-buttons"><button class="button button-secondary" data-go="statistics">Estadística</button><button class="button button-primary" data-action="shift-close">Cerrar turno</button></div>`)}
+  appRoot.innerHTML = `${volatileBanner()}${pageHeading(`Turno ${SHIFT_LABELS[state.shift.type] || state.shift.type} · desde ${formatTimeOfDay(state.shift.started_at)}`, "Ventas del turno", `Total ${money(openTotal + closedTotal)} · cobrado y por cobrar, actualizado en todos los dispositivos.`, `<div class="page-heading-buttons"><button class="button button-secondary" data-go="statistics">Estadística</button><button class="button button-primary" data-action="shift-close">Cerrar turno</button></div>`)}
     <section class="stats" aria-label="Resumen de ventas y cocina">
       <div class="stat"><div class="stat-label">Ventas abiertas</div><div class="stat-value">${money(openTotal)}</div><div class="stat-sub">${plural(openTables.length, "mesa", "mesas")} · ${plural(openUnits, "unidad", "unidades")}</div></div>
       <div class="stat"><div class="stat-label">Ventas cerradas</div><div class="stat-value">${money(closedTotal)}</div><div class="stat-sub">${plural(tickets.length, "cobro", "cobros")} · ${plural(closedUnits, "unidad", "unidades")}</div></div>
@@ -459,7 +464,7 @@ function renderMenu() {
     const products = state.menu.filter((dish) => dish.category === category).map((dish) => `<article class="menu-row ${dish.available ? "" : "unavailable"}"><div><h3>${escapeHtml(dish.name)}</h3><p>${escapeHtml(dish.description || "Sin descripción")} · ${dish.available ? "Disponible" : "Pausado"}</p></div><strong>${money(dish.price)}</strong><div class="menu-actions"><button class="icon-button" data-action="edit-product" data-menu-id="${escapeHtml(dish.id)}" aria-label="Editar ${escapeHtml(dish.name)}" title="Editar">✎</button><button class="icon-button" data-action="delete-product" data-menu-id="${escapeHtml(dish.id)}" aria-label="Eliminar ${escapeHtml(dish.name)}" title="Eliminar">×</button></div></article>`).join("");
     return `<section class="table-section"><h2 class="menu-category">${escapeHtml(category)}</h2><div class="menu-list">${products}</div></section>`;
   }).join("");
-  appRoot.innerHTML = `${pageHeading("Productos y precios", "Carta del bar", `${state.menu.length} productos · los cambios se ven en todos los teléfonos.`, addButton)}${rows || `<section class="section-panel"><div class="empty-state"><h2>La carta está vacía</h2><p>Agregá el primer producto para empezar.</p></div></section>`}`;
+  appRoot.innerHTML = `${volatileBanner()}${pageHeading("Productos y precios", "Carta del bar", `${state.menu.length} productos · los cambios se ven en todos los teléfonos.`, addButton)}${rows || `<section class="section-panel"><div class="empty-state"><h2>La carta está vacía</h2><p>Agregá el primer producto para empezar.</p></div></section>`}`;
 }
 
 function showDialog({ eyebrow = "", title, body, submitLabel = "Guardar", cancelLabel = "Cancelar", onSubmit }) {

@@ -455,3 +455,5 @@ h1, h2, h3 { font-family: 'Manrope', 'Avenir Next', sans-serif; }
 .shift-summary strong { font: 800 18px 'Manrope', sans-serif; }
 .sales-closure .button-small { margin-top: 8px; }
 @media (max-width: 760px) { .shift-badge { padding: 4px 8px; font-size: 11px; } }
+.storage-warning { display: grid; gap: 4px; margin: 0 0 16px; padding: 12px 15px; border: 1px solid #8a2e24; border-radius: 7px; color: #ffb4aa; background: #2e120f; font-size: 13px; }
+.storage-warning strong { font-size: 14px; }

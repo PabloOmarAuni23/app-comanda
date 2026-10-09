@@ -11,6 +11,7 @@ from pathlib import Path
 from flask import Flask, jsonify, render_template, request
 
 from carta import CARTA_SECTIONS, INFUSION_EXTRA_PRODUCTS, INFUSION_OPTIONS
+from storage import PostgresConnection
 
 
 app = Flask(__name__)
@@ -376,7 +377,18 @@ def initial_state():
     }
 
 
+def database_url():
+    return os.environ.get("DATABASE_URL", "").strip()
+
+
+def storage_is_volatile():
+    """En Render sin base externa ni disco, el archivo SQLite se borra en cada reinicio o despliegue."""
+    return bool(os.environ.get("RENDER")) and not database_url() and not os.environ.get("DATABASE_PATH")
+
+
 def connect_db():
+    if database_url():
+        return PostgresConnection(database_url())
     DATABASE_PATH.parent.mkdir(parents=True, exist_ok=True)
     connection = sqlite3.connect(DATABASE_PATH, timeout=15)
     connection.row_factory = sqlite3.Row
@@ -733,7 +745,7 @@ def service_worker():
 @app.get("/api/state")
 def api_state():
     state, updated_at = read_state()
-    return jsonify({**state, "updated_at": updated_at})
+    return jsonify({**state, "updated_at": updated_at, "storage_volatile": storage_is_volatile()})
 
 
 @app.post("/api/action")
@@ -743,7 +755,7 @@ def api_action():
         state, updated_at = mutate_state(action)
     except (ValueError, TypeError, OverflowError) as error:
         return jsonify({"error": str(error)}), 400
-    return jsonify({**state, "updated_at": updated_at})
+    return jsonify({**state, "updated_at": updated_at, "storage_volatile": storage_is_volatile()})
 
 
 initialize_db()
