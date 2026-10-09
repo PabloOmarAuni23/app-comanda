@@ -52,9 +52,13 @@ const alertSounds = {
   critical: () => playTones([[988, 0, 0.14], [784, 0.18, 0.14], [988, 0.36, 0.14], [784, 0.54, 0.14], [988, 0.72, 0.14], [784, 0.9, 0.2]], { type: "square", volume: 0.25 }),
 };
 
+function isKitchenListener() {
+  return currentRole === "cocina" || (currentRole !== "" && activeView === "kitchen");
+}
+
 function updateSoundButton() {
   if (!soundButton) return;
-  soundButton.hidden = currentRole !== "cocina";
+  soundButton.hidden = !isKitchenListener();
   const needsTap = !soundMuted && (!audioContext || audioContext.state !== "running");
   soundButton.textContent = soundMuted ? "🔕" : "🔔";
   soundButton.classList.toggle("sound-needs-tap", needsTap);
@@ -70,7 +74,7 @@ function oldestPendingSentAt(table) {
 
 function checkKitchenAlerts() {
   updateSoundButton();
-  if (currentRole !== "cocina") {
+  if (!isKitchenListener()) {
     alertsInitialized = false;
     seenKitchenItems.clear();
     ticketAlertLevels.clear();
