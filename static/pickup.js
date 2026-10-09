@@ -2,10 +2,15 @@ const renderApplication = render;
 const renderOrderFlow = orderFlow;
 
 orderFlow = function (table) {
-  return renderOrderFlow({
+  const flow = renderOrderFlow({
     ...table,
     items: table.items.filter((item) => item.status !== "ready" || !item.retrieved_at),
   });
+  const pending = table.items.filter((item) => ["sent", "preparing", "suspended"].includes(item.status) && item.sent_at);
+  if (!flow || !pending.length) return flow;
+  const oldest = pending.reduce((first, item) => (Date.parse(item.sent_at) < Date.parse(first.sent_at) ? item : first)).sent_at;
+  const clock = createClock(oldest, null).outerHTML;
+  return flow.replace(/<\/span>$/, `${clock}</span>`);
 };
 
 render = function () {
