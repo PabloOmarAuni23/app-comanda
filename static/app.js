@@ -39,13 +39,14 @@ function tableTotal(table) {
 
 function itemModifierParts(item) {
   return (item.modifiers || []).map((modifier) => {
-    const quantity = item.unit_mode ? modifier.quantity : modifier.quantity * item.quantity;
+    if (item.unit_mode) return { group: "", option: `${modifier.name} ${modifier.quantity}` };
+    const quantity = modifier.quantity * item.quantity;
     return { group: String(modifier.group ?? ""), option: quantity > 1 ? `${quantity} × ${modifier.name}` : String(modifier.name ?? "") };
   });
 }
 
 function itemModifierLines(item) {
-  return itemModifierParts(item).map((part) => `${escapeHtml(part.group)}: ${escapeHtml(part.option)}`);
+  return itemModifierParts(item).map((part) => `${part.group ? `${escapeHtml(part.group)}: ` : ""}${escapeHtml(part.option)}`);
 }
 
 function itemModifierSummary(item) {
@@ -53,7 +54,7 @@ function itemModifierSummary(item) {
 }
 
 function itemModifierText(item) {
-  return itemModifierParts(item).map((part) => `${part.group}: ${part.option}`).join(" · ");
+  return itemModifierParts(item).map((part) => `${part.group ? `${part.group}: ` : ""}${part.option}`).join(" · ");
 }
 
 function guestsSuffix(table) {
