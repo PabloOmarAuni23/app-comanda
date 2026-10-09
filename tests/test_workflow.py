@@ -558,6 +558,23 @@ class ComandaWorkflowTests(unittest.TestCase):
         self.assertEqual(tables["Mesa 2"], "Salón adentro")
         self.assertEqual({tables[name] for name in ("D1", "S1", "Patio", "Mesa 9")}, {"Salón afuera"})
 
+    def test_paid_tables_are_recorded_as_tickets_and_closed_with_the_shift(self):
+        self.action("table_open", table_id="1", waiter="Prueba")
+        self.action("item_add", table_id="1", menu_id="menu-te", quantity=2)
+        sent = self.action("order_send", table_id="1")
+        item_id = sent.json["tables"][0]["items"][0]["id"]
+        self.action("item_status", table_id="1", item_id=item_id, status="ready")
+        paid = self.action("table_paid", table_id="1")
+        self.assertEqual(paid.status_code, 200)
+        tickets = paid.json["pending_tickets"]
+        self.assertEqual(len(tickets), 1)
+        self.assertEqual((tickets[0]["table_name"], tickets[0]["total"], tickets[0]["units"]), ("Mesa 1", 4000, 2))
+
+        closed = self.action("sales_close", shift="morning")
+        self.assertEqual(closed.status_code, 200)
+        self.assertEqual(closed.json["pending_tickets"], [])
+        self.assertEqual(closed.json["sales_closures"][-1]["total_amount"], 4000)
+        self.assertEqual(closed.json["sales_closures"][-1]["tickets"], 1)
 
 class SiteMenuTests(unittest.TestCase):
     def setUp(self):

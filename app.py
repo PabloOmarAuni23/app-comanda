@@ -427,6 +427,7 @@ def read_state():
         state, updated_at = ensure_existing_state(connection)
     state.setdefault("pending_sales", [])
     state.setdefault("sales_closures", [])
+    state.setdefault("pending_tickets", [])
     return state, updated_at
 
 
@@ -436,6 +437,7 @@ def mutate_state(action):
         state, _ = ensure_existing_state(connection)
         state.setdefault("pending_sales", [])
         state.setdefault("sales_closures", [])
+        state.setdefault("pending_tickets", [])
         tables = state["tables"]
         menu = state["menu"]
         action_type = action.get("type")
@@ -594,6 +596,13 @@ def mutate_state(action):
                     state["pending_sales"].append({"name": name, "quantity": quantity})
                 else:
                     sale["quantity"] += quantity
+            state["pending_tickets"].append({
+                "table_id": table["id"],
+                "table_name": table["name"],
+                "total": sum(int(item.get("price", 0) or 0) * int(item.get("quantity", 0) or 0) for item in billable_items),
+                "units": sum(int(item.get("quantity", 0) or 0) for item in billable_items),
+                "paid_at": stamp,
+            })
             table.update(status="cleaning", paid_at=stamp)
         elif action_type == "sales_close":
             shift = str(action.get("shift", ""))
@@ -607,9 +616,12 @@ def mutate_state(action):
                 "closed_at": stamp,
                 "items": [dict(item) for item in state["pending_sales"]],
                 "total_units": sum(int(item["quantity"]) for item in state["pending_sales"]),
+                "total_amount": sum(int(ticket["total"]) for ticket in state["pending_tickets"]),
+                "tickets": len(state["pending_tickets"]),
             }
             state["sales_closures"].append(closure)
             state["pending_sales"] = []
+            state["pending_tickets"] = []
         elif action_type == "table_clean":
             table = find_table()
             if table["status"] != "cleaning":

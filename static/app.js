@@ -239,27 +239,33 @@ function render() {
 }
 
 function renderHome() {
-  const free = state.tables.filter((table) => table.status === "free").length;
-  const open = state.tables.filter((table) => table.status === "open").length;
+  const openTables = state.tables.filter((table) => table.status === "open");
+  const billableUnits = (table) => table.items.filter((item) => item.status !== "canceled").reduce((sum, item) => sum + item.quantity, 0);
+  const openTotal = openTables.reduce((sum, table) => sum + tableTotal(table), 0);
+  const openUnits = openTables.reduce((sum, table) => sum + billableUnits(table), 0);
+  const tickets = Array.isArray(state.pending_tickets) ? state.pending_tickets : [];
+  const closedTotal = tickets.reduce((sum, ticket) => sum + Number(ticket.total || 0), 0);
+  const closedUnits = tickets.reduce((sum, ticket) => sum + Number(ticket.units || 0), 0);
   const cooking = state.tables.flatMap((table) => table.items).filter((item) => ["sent", "preparing", "suspended"].includes(item.status)).length;
   const ready = state.tables.flatMap((table) => table.items).filter((item) => item.status === "ready").length;
-  const tables = state.tables.map((table) => `<button class="mini-table ${table.status === "open" ? "occupied" : ""}" data-table="${escapeHtml(table.id)}"><strong>${escapeHtml(table.name)}</strong><span>${table.status === "open" ? money(tableTotal(table)) : statusLabel(table.status)}</span></button>`).join("");
-  const liveOrders = state.tables.filter((table) => table.status === "open" && table.items.length).slice(0, 4);
-  const activity = liveOrders.length ? liveOrders.map((table) => `<button class="order-row" data-table="${escapeHtml(table.id)}"><span><span class="order-name">${escapeHtml(table.name)}</span><br><span class="order-meta">${table.items.length} ${table.items.length === 1 ? "producto" : "productos"} · ${escapeHtml(table.opened_by)}${guestsSuffix(table)}</span></span>${orderFlow(table) || `<span class="status open">En curso</span>`}<span class="order-price">${money(tableTotal(table))}</span></button>`).join("") : `<div class="activity-empty"><div class="empty-mark">⌂</div>Las mesas abiertas van a aparecer acá.</div>`;
+  const plural = (count, singular, pluralForm) => `${count} ${count === 1 ? singular : pluralForm}`;
+  const liveOrders = openTables.filter((table) => table.items.length);
+  const openRows = liveOrders.length ? liveOrders.map((table) => `<button class="order-row" data-table="${escapeHtml(table.id)}"><span><span class="order-name">${escapeHtml(table.name)}</span><br><span class="order-meta">${plural(table.items.length, "producto", "productos")} · ${escapeHtml(table.opened_by)}${guestsSuffix(table)}</span></span>${orderFlow(table) || `<span class="status open">En curso</span>`}<span class="order-price">${money(tableTotal(table))}</span></button>`).join("") : `<div class="activity-empty"><div class="empty-mark">⌂</div>Las mesas abiertas van a aparecer acá.</div>`;
+  const formatTime = (timestamp) => new Intl.DateTimeFormat("es-AR", { hour: "2-digit", minute: "2-digit" }).format(new Date(timestamp));
+  const closedRows = tickets.length ? tickets.slice().reverse().map((ticket) => `<div class="order-row"><span><span class="order-name">${escapeHtml(ticket.table_name)}</span><br><span class="order-meta">${plural(Number(ticket.units) || 0, "unidad", "unidades")} · ${formatTime(ticket.paid_at)}</span></span><span class="status ready">Cobrada</span><span class="order-price">${money(ticket.total)}</span></div>`).join("") : `<div class="activity-empty"><div class="empty-mark">$</div>Los cobros del turno van a aparecer acá.</div>`;
 
-  appRoot.innerHTML = `${pageHeading("Resumen del turno", "Comanda del bar", "Mesas, pedidos y cocina se actualizan entre todos los dispositivos.", `<button class="button button-secondary" data-go="statistics">Estadística</button>`)}
-    <section class="stats" aria-label="Resumen de mesas y pedidos">
-      <div class="stat"><div class="stat-label">Mesas libres</div><div class="stat-value">${free}</div></div>
-      <div class="stat"><div class="stat-label">Abiertas</div><div class="stat-value">${open}</div></div>
-      <div class="stat"><div class="stat-label">En cocina</div><div class="stat-value accent">${cooking}</div></div>
-      <div class="stat"><div class="stat-label">Listos para retirar</div><div class="stat-value">${ready}</div></div>
+  appRoot.innerHTML = `${pageHeading("Resumen del turno", "Ventas del turno", `Total ${money(openTotal + closedTotal)} · cobrado y por cobrar, actualizado en todos los dispositivos.`, `<button class="button button-secondary" data-go="statistics">Estadística</button>`)}
+    <section class="stats" aria-label="Resumen de ventas y cocina">
+      <div class="stat"><div class="stat-label">Ventas abiertas</div><div class="stat-value">${money(openTotal)}</div><div class="stat-sub">${plural(openTables.length, "mesa", "mesas")} · ${plural(openUnits, "unidad", "unidades")}</div></div>
+      <div class="stat"><div class="stat-label">Ventas cerradas</div><div class="stat-value">${money(closedTotal)}</div><div class="stat-sub">${plural(tickets.length, "cobro", "cobros")} · ${plural(closedUnits, "unidad", "unidades")}</div></div>
+      <div class="stat"><div class="stat-label">En cocina</div><div class="stat-value accent">${cooking}</div><div class="stat-sub">productos en preparación</div></div>
+      <div class="stat"><div class="stat-label">Listos para retirar</div><div class="stat-value">${ready}</div><div class="stat-sub">esperando al mozo</div></div>
     </section>
     <div class="home-grid">
-      <section class="section-panel"><div class="section-title"><h2>Mesas</h2><button class="text-button" data-go="tables">Ver todas →</button></div><div class="overview-tables">${tables || ""}</div></section>
-      <section class="section-panel"><div class="section-title"><h2>Pedidos activos</h2><button class="text-button" data-go="kitchen">Abrir cocina →</button></div><div class="order-list">${activity}</div></section>
+      <section class="section-panel"><div class="section-title"><h2>Ventas abiertas</h2><button class="text-button" data-go="kitchen">Abrir cocina →</button></div><div class="order-list">${openRows}</div></section>
+      <section class="section-panel"><div class="section-title"><h2>Ventas cerradas</h2><button class="text-button" data-go="statistics">Estadística →</button></div><div class="order-list">${closedRows}</div></section>
     </div>`;
 }
-
 function renderStatistics() {
   const pendingSales = Array.isArray(state.pending_sales) ? state.pending_sales : [];
   const closures = Array.isArray(state.sales_closures) ? state.sales_closures : [];
