@@ -489,3 +489,40 @@ class ComandaWorkflowTests(unittest.TestCase):
         self.action("item_status", table_id="1", item_id=item_id, status="ready")
         retrieved = self.action("order_retrieve", table_id="1", item_id=item_id)
         self.assertEqual(retrieved.status_code, 400)
+
+    def test_default_tables_are_grouped_by_zone(self):
+        tables = self.client.get("/api/state").json["tables"]
+        by_zone = {}
+        for table in tables:
+            by_zone.setdefault(table["zone"], []).append(table["name"])
+        self.assertEqual(by_zone["Salón adentro"], [f"Mesa {number}" for number in range(1, 9)])
+        self.assertEqual(by_zone["Salón afuera"], [f"Mesa {number}" for number in range(9, 17)])
+        self.assertEqual(by_zone["Desayunador"], [f"D{number}" for number in range(1, 6)])
+        self.assertEqual(by_zone["Sombrillas"], ["S1", "S2"])
+
+    def test_existing_state_gets_zones_and_missing_tables(self):
+        with app.closing(app.connect_db()) as connection, connection:
+            document = {
+                "_migrations": ["classic-combo-v1", "classic-combo-v2"],
+                "tables": [
+                    {"id": "1", "name": "Mesa 1", "status": "open", "opened_by": "Ana", "opened_at": None, "guests": 2, "items": []},
+                    {"id": "custom", "name": "Patio", "status": "free", "opened_by": "", "opened_at": None, "guests": None, "items": []},
+                ],
+                "pending_sales": [],
+                "sales_closures": [],
+                "menu": [],
+            }
+            connection.execute("UPDATE app_state SET document = ? WHERE id = 1", (app.json.dumps(document),))
+        tables = {table["name"]: table for table in self.client.get("/api/state").json["tables"]}
+        self.assertEqual(tables["Mesa 1"]["zone"], "Salón adentro")
+        self.assertEqual(tables["Mesa 1"]["status"], "open")
+        self.assertEqual(tables["Patio"]["zone"], "Otras")
+        self.assertEqual(len(tables), 24)
+        self.assertIn("S2", tables)
+
+    def test_new_table_can_be_added_to_a_zone(self):
+        created = self.action("table_create", name="Mesa 17", zone="Salón afuera")
+        self.assertEqual(created.status_code, 200)
+        self.assertEqual(created.json["tables"][-1]["zone"], "Salón afuera")
+        fallback = self.action("table_create", name="Rincón", zone="inexistente")
+        self.assertEqual(fallback.json["tables"][-1]["zone"], "Otras")

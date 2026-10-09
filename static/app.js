@@ -239,7 +239,7 @@ function renderHome() {
   const open = state.tables.filter((table) => table.status === "open").length;
   const cooking = state.tables.flatMap((table) => table.items).filter((item) => ["sent", "preparing", "suspended"].includes(item.status)).length;
   const ready = state.tables.flatMap((table) => table.items).filter((item) => item.status === "ready").length;
-  const tables = state.tables.slice(0, 8).map((table) => `<button class="mini-table ${table.status === "open" ? "occupied" : ""}" data-table="${escapeHtml(table.id)}"><strong>${escapeHtml(table.name)}</strong><span>${table.status === "open" ? money(tableTotal(table)) : statusLabel(table.status)}</span></button>`).join("");
+  const tables = state.tables.map((table) => `<button class="mini-table ${table.status === "open" ? "occupied" : ""}" data-table="${escapeHtml(table.id)}"><strong>${escapeHtml(table.name)}</strong><span>${table.status === "open" ? money(tableTotal(table)) : statusLabel(table.status)}</span></button>`).join("");
   const liveOrders = state.tables.filter((table) => table.status === "open" && table.items.length).slice(0, 4);
   const activity = liveOrders.length ? liveOrders.map((table) => `<button class="order-row" data-table="${escapeHtml(table.id)}"><span><span class="order-name">${escapeHtml(table.name)}</span><br><span class="order-meta">${table.items.length} ${table.items.length === 1 ? "producto" : "productos"} · ${escapeHtml(table.opened_by)}${guestsSuffix(table)}</span></span>${orderFlow(table) || `<span class="status open">En curso</span>`}<span class="order-price">${money(tableTotal(table))}</span></button>`).join("") : `<div class="activity-empty"><div class="empty-mark">⌂</div>Las mesas abiertas van a aparecer acá.</div>`;
 
@@ -275,15 +275,27 @@ function renderStatistics() {
     <section class="section-panel sales-history"><div class="section-title"><h2>Últimos cierres</h2></div>${history || `<p class="order-meta">Todavía no hay cierres guardados.</p>`}</section>`;
 }
 
+const TABLE_ZONES = ["Salón adentro", "Salón afuera", "Desayunador", "Sombrillas", "Otras"];
+
+function tableZone(table) {
+  return TABLE_ZONES.includes(table.zone) ? table.zone : "Otras";
+}
+
 function renderTables() {
   const openCount = state.tables.filter((table) => table.status === "open").length;
   const createButton = `<button class="button button-primary" data-action="add-table">＋ <span>Mesa</span></button>`;
-  const tiles = state.tables.map((table) => {
+  const renderTile = (table) => {
     const description = table.status === "open" ? `${table.items.length} productos · ${money(tableTotal(table))}` : table.status === "cleaning" ? "Cobro registrado" : "Tocá para abrir";
     const caption = table.status === "open" ? `Atiende ${table.opened_by}${guestsSuffix(table)}` : statusLabel(table.status);
     return `<button class="table-tile ${table.status}" data-table="${escapeHtml(table.id)}"><span class="status ${table.status}">${statusLabel(table.status)}</span><strong>${escapeHtml(table.name)}</strong><span class="table-detail">${escapeHtml(description)}</span><span class="table-detail">${escapeHtml(caption)}</span>${table.status === "open" ? orderFlow(table) : ""}</button>`;
+  };
+  const zoneSections = TABLE_ZONES.map((zone) => {
+    const zoneTables = state.tables.filter((table) => tableZone(table) === zone);
+    if (!zoneTables.length) return "";
+    const zoneOpen = zoneTables.filter((table) => table.status === "open").length;
+    return `<section class="table-zone"><div class="table-zone-heading"><h2>${escapeHtml(zone)}</h2><span>${zoneOpen} de ${zoneTables.length} ocupadas</span></div><div class="table-grid">${zoneTables.map(renderTile).join("")}</div></section>`;
   }).join("");
-  appRoot.innerHTML = `${pageHeading("Servicio", "Mesas", `${openCount} abiertas · tocá una mesa para abrirla o ver el pedido.`, createButton)}<div class="table-grid">${tiles}</div>`;
+  appRoot.innerHTML = `${pageHeading("Servicio", "Mesas", `${openCount} abiertas · tocá una mesa para abrirla o ver el pedido.`, createButton)}${zoneSections}`;
 }
 
 function renderTableDetail() {
@@ -374,7 +386,7 @@ function renderKitchen() {
         : `<select class="kitchen-state-select" aria-label="Estado de ${escapeHtml(item.name)}" data-action="item-status-select" data-table-id="${escapeHtml(table.id)}" data-item-id="${escapeHtml(item.id)}">${optionMarkup}</select><button class="kitchen-advance" type="button" title="${nextLabel}" aria-label="${nextLabel}" data-action="item-status" data-table-id="${escapeHtml(table.id)}" data-item-id="${escapeHtml(item.id)}" data-status="${nextStatus}">▶</button>`;
       return `<article class="ticket-item ${item.priority ? "ticket-priority" : ""} ${isCanceled ? "ticket-canceled" : ""}"><div class="ticket-product"><span class="ticket-item-quantity">${item.quantity}</span><div><strong>${escapeHtml(item.name)}</strong>${modifierLines.length ? `<p class="ticket-modifiers">${modifierLines.join("<br>")}</p>` : ""}${item.note ? `<p class="ticket-note">${escapeHtml(item.note)}</p>` : ""}</div></div><div class="ticket-item-controls">${statusControls}</div>${isCanceled ? "" : `<div class="ticket-item-tools">${priorityToggle}${hasEditableControls ? editButton + cancelButton : ""}</div>`}</article>`;
     }).join("");
-    return `<section class="kitchen-ticket"><header class="ticket-head ${timing.className}"><div class="ticket-heading-main"><div class="ticket-heading-top"><span class="ticket-sent-time">${kitchenSentTime(oldestItem.sent_at)}</span><span class="kitchen-timer" role="timer" aria-label="Pedido hace ${timing.minutes} minutos: ${timing.label}"><strong>${timing.minutes} min</strong></span></div><h2>${escapeHtml(table.name)}</h2><p>Principal · Atiende ${escapeHtml(table.opened_by)}${guestsSuffix(table)}</p></div><span class="status open">${items.length} prod.</span></header><div class="ticket-items">${renderedItems}</div><footer class="ticket-footer"><span class="ticket-footer-meta">${items.length} pendientes</span><button class="button button-finish-all" data-action="finish-ticket" data-table-id="${escapeHtml(table.id)}">Terminar todo</button></footer></section>`;
+    return `<section class="kitchen-ticket"><header class="ticket-head ${timing.className}"><div class="ticket-heading-main"><div class="ticket-heading-top"><span class="ticket-sent-time">${kitchenSentTime(oldestItem.sent_at)}</span><span class="kitchen-timer" role="timer" aria-label="Pedido hace ${timing.minutes} minutos: ${timing.label}"><strong>${timing.minutes} min</strong></span></div><h2>${escapeHtml(table.name)}</h2><p>${escapeHtml(tableZone(table))} · Atiende ${escapeHtml(table.opened_by)}${guestsSuffix(table)}</p></div><span class="status open">${items.length} prod.</span></header><div class="ticket-items">${renderedItems}</div><footer class="ticket-footer"><span class="ticket-footer-meta">${items.length} pendientes</span><button class="button button-finish-all" data-action="finish-ticket" data-table-id="${escapeHtml(table.id)}">Terminar todo</button></footer></section>`;
   }).join("");
   const readyCount = state.tables.reduce((sum, table) => sum + table.items.filter((item) => item.status === "ready").length, 0);
   appRoot.innerHTML = `<div class="kitchen-board-heading"><div><p class="eyebrow">Producción</p><h1>Cocina</h1></div><span class="status ready">${readyCount} listos</span></div><div class="kitchen-toolbar" aria-label="Filtrar comandas">${filters}</div><div class="kitchen-grid">${cards || `<section class="section-panel kitchen-empty"><div class="empty-state"><div class="empty-mark">♨</div><h2>${activeItems.length ? "No hay pedidos en este filtro" : "Cocina al día"}</h2><p>${activeItems.length ? "Elegí otro tiempo para ver las comandas." : "Los pedidos enviados por los mozos van a aparecer acá."}</p></div></section>`}</div>`;
@@ -406,7 +418,7 @@ function showDialog({ eyebrow = "", title, body, submitLabel = "Guardar", onSubm
 }
 
 function showAddTableDialog() {
-  showDialog({ eyebrow: "Salón", title: "Agregar mesa", body: `<label class="dialog-field">Nombre o número<input name="name" maxlength="40" placeholder="Por ejemplo: Patio 1" required></label>`, submitLabel: "Agregar mesa", onSubmit: (data) => sendAction({ type: "table_create", name: data.name }, "Mesa agregada.") });
+  showDialog({ eyebrow: "Salón", title: "Agregar mesa", body: `<label class="dialog-field">Sector<select name="zone">${TABLE_ZONES.map((zone) => `<option value="${escapeHtml(zone)}">${escapeHtml(zone)}</option>`).join("")}</select></label><label class="dialog-field">Nombre o número<input name="name" maxlength="40" placeholder="Por ejemplo: Mesa 17" required></label>`, submitLabel: "Agregar mesa", onSubmit: (data) => sendAction({ type: "table_create", name: data.name, zone: data.zone }, "Mesa agregada.") });
 }
 
 function showOpenTableDialog(table) {

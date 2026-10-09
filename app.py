@@ -276,13 +276,43 @@ def merge_menu_entries(existing_menu, incoming_menu):
     return merged
 
 
+ZONE_INSIDE = "Salón adentro"
+ZONE_OUTSIDE = "Salón afuera"
+ZONE_BREAKFAST = "Desayunador"
+ZONE_PARASOLS = "Sombrillas"
+ZONE_OTHER = "Otras"
+ZONES = [ZONE_INSIDE, ZONE_OUTSIDE, ZONE_BREAKFAST, ZONE_PARASOLS, ZONE_OTHER]
+
+
+def new_table(table_id, name, zone):
+    return {"id": table_id, "name": name, "zone": zone, "status": "free", "opened_by": "", "opened_at": None, "guests": None, "items": []}
+
+
+def default_tables():
+    return (
+        [new_table(str(number), f"Mesa {number}", ZONE_INSIDE) for number in range(1, 9)]
+        + [new_table(str(number), f"Mesa {number}", ZONE_OUTSIDE) for number in range(9, 17)]
+        + [new_table(f"d{number}", f"D{number}", ZONE_BREAKFAST) for number in range(1, 6)]
+        + [new_table(f"s{number}", f"S{number}", ZONE_PARASOLS) for number in range(1, 3)]
+    )
+
+
+def apply_zones_migration(state):
+    default_zone_by_name = {table["name"].casefold(): table["zone"] for table in default_tables()}
+    tables = state["tables"]
+    for table in tables:
+        table["zone"] = default_zone_by_name.get(str(table.get("name", "")).casefold(), ZONE_OTHER)
+    existing_names = {str(table.get("name", "")).casefold() for table in tables}
+    existing_ids = {str(table.get("id", "")) for table in tables}
+    for table in default_tables():
+        if table["name"].casefold() not in existing_names and table["id"] not in existing_ids:
+            tables.append(table)
+
+
 def initial_state():
     return {
-        "_migrations": ["classic-combo-v1", "classic-combo-v2"],
-        "tables": [
-            {"id": str(number), "name": f"Mesa {number}", "status": "free", "opened_by": "", "opened_at": None, "guests": None, "items": []}
-            for number in range(1, 9)
-        ],
+        "_migrations": ["classic-combo-v1", "classic-combo-v2", "zones-v1"],
+        "tables": default_tables(),
         "pending_sales": [],
         "sales_closures": [],
         "menu": [
@@ -334,6 +364,10 @@ def ensure_existing_state(connection):
             make_classic_combo_conditional(state)
             migrations.append("classic-combo-v2")
             updated = True
+        if "zones-v1" not in migrations:
+            apply_zones_migration(state)
+            migrations.append("zones-v1")
+            updated = True
         state["_migrations"] = migrations
         if updated:
             stamp = now_iso()
@@ -383,7 +417,8 @@ def mutate_state(action):
                 raise ValueError("Escribí el nombre de la mesa.")
             if any(entry["name"].casefold() == name.casefold() for entry in tables):
                 raise ValueError("Ya existe una mesa con ese nombre.")
-            tables.append({"id": str(uuid.uuid4()), "name": name, "status": "free", "opened_by": "", "opened_at": None, "guests": None, "items": []})
+            zone = str(action.get("zone", "")).strip()
+            tables.append(new_table(str(uuid.uuid4()), name, zone if zone in ZONES else ZONE_OTHER))
         elif action_type == "table_open":
             table = find_table()
             if table["status"] != "free":
