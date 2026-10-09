@@ -219,18 +219,24 @@ def modifier_visibility(groups, selected_by_group):
     return visible
 
 
-def is_variant_group(dish, group):
-    """Un grupo de cantidades cuyas opciones cuestan lo mismo que el producto son variantes del mismo:
-    cada opción elegida es una unidad y el precio base no se suma de nuevo."""
-    options = group.get("options", [])
+def is_unit_product(dish):
+    """Producto armado solo con grupos de cantidades cuyas opciones son gratis o cuestan lo mismo que el producto
+    (por ejemplo una tortilla con sus variedades): cada unidad elegida se cobra al precio del producto."""
+    groups = dish.get("modifier_groups", [])
     base_price = dish.get("price", 0)
-    return group.get("selection") == "quantity" and base_price > 0 and bool(options) and all(option["price"] == base_price for option in options)
+    return base_price > 0 and bool(groups) and all(
+        group.get("selection") == "quantity" and all(option["price"] in (0, base_price) for option in group.get("options", []))
+        for group in groups
+    )
 
 
-def unit_price_for(dish, modifiers):
-    variant_groups = {group["name"] for group in dish.get("modifier_groups", []) if is_variant_group(dish, group)}
-    base_price = 0 if any(entry["group"] in variant_groups for entry in modifiers) else dish["price"]
-    return base_price + sum(entry["unit_price"] * entry["quantity"] for entry in modifiers)
+def price_item(dish, modifiers, requested_quantity):
+    if is_unit_product(dish):
+        units = sum(entry["quantity"] for entry in modifiers)
+        if units < 1:
+            raise ValueError(f"Elegí cuántas unidades querés de {dish['name']}.")
+        return dish["price"], min(units, 999), True
+    return dish["price"] + sum(entry["unit_price"] * entry["quantity"] for entry in modifiers), requested_quantity, False
 
 
 def select_modifiers(dish, value):
@@ -490,12 +496,13 @@ def mutate_state(action):
                 raise ValueError("Ese producto ya no está disponible.")
             quantity = max(1, min(int(action.get("quantity", 1)), 99))
             modifiers = select_modifiers(dish, action.get("modifiers", []))
-            unit_price = unit_price_for(dish, modifiers)
+            unit_price, quantity, unit_mode = price_item(dish, modifiers, quantity)
             table["items"].append({
                 "id": str(uuid.uuid4()), "menu_id": dish["id"], "name": dish["name"], "price": unit_price,
                 "modifiers": modifiers,
                 "quantity": quantity, "note": str(action.get("note", "")).strip()[:160], "status": "draft", "added_by": str(action.get("waiter", "Equipo")).strip()[:40] or "Equipo",
                 "priority": action.get("priority") is True, "created_at": stamp, "sent_at": None,
+                "unit_mode": unit_mode,
             })
         elif action_type == "order_send":
             table = find_table()
@@ -568,7 +575,8 @@ def mutate_state(action):
                     edited_modifiers = select_modifiers(menu_item, action["modifiers"])
                 except ValueError as error:
                     raise ValueError(str(error)) from error
-                unit_price = unit_price_for(menu_item, edited_modifiers)
+                unit_price, quantity, unit_mode = price_item(menu_item, edited_modifiers, quantity)
+                item["unit_mode"] = unit_mode
                 if len(edited_modifiers) != len(item["modifiers"]):
                     item["edited_by"] = str(action.get("waiter", "Equipo")).strip()[:40] or "Equipo"
                     item["edited_at"] = stamp
@@ -576,6 +584,8 @@ def mutate_state(action):
             else:
                 edited_modifiers = item["modifiers"]
                 unit_price = item["price"]
+                if item.get("unit_mode"):
+                    quantity = item["quantity"]
             item["quantity"] = quantity
             if "note" in action:
                 item["note"] = str(action.get("note", "")).strip()[:160]

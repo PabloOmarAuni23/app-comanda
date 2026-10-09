@@ -575,41 +575,67 @@ class ComandaWorkflowTests(unittest.TestCase):
         self.assertEqual(closed.json["pending_tickets"], [])
         self.assertEqual(closed.json["sales_closures"][-1]["total_amount"], 4000)
         self.assertEqual(closed.json["sales_closures"][-1]["tickets"], 1)
-    def variant_dish(self, base_price=3000, option_price=3000):
-        created = self.action("menu_add", name="Tortilla", category="Para acompañar", price=base_price, modifier_groups=[{
+    def unit_dish(self, option_price=0, name="Tortilla"):
+        created = self.action("menu_add", name=name, category="Para acompañar", price=3000, modifier_groups=[{
             "name": "Para acompañar",
             "selection": "quantity",
             "required": False,
-            "options": [{"name": name, "price": option_price} for name in ("gruesa", "fina", "bollito", "sacramento")],
+            "options": [{"name": option, "price": option_price} for option in ("gruesa", "fina", "bollito")],
         }])
-        return next(dish for dish in created.json["menu"] if dish["name"] == "Tortilla")["id"]
+        return next(dish for dish in created.json["menu"] if dish["name"] == name)["id"]
 
-    def test_variant_options_priced_like_the_product_count_as_units(self):
-        dish_id = self.variant_dish()
+    def test_chosen_options_are_units_charged_at_the_product_price(self):
+        for option_price in (0, 3000):
+            with self.subTest(option_price=option_price):
+                dish_id = self.unit_dish(option_price=option_price, name=f"Tortilla {option_price}")
+                self.action("table_open", table_id="1", waiter="Prueba") if option_price == 0 else None
+                added = self.action("item_add", table_id="1", menu_id=dish_id, quantity=1, modifiers=[
+                    {"group": "Para acompañar", "option": "fina", "quantity": 2},
+                    {"group": "Para acompañar", "option": "bollito", "quantity": 1},
+                ])
+                self.assertEqual(added.status_code, 200)
+                item = added.json["tables"][0]["items"][-1]
+                self.assertEqual((item["quantity"], item["price"], item["unit_mode"]), (3, 3000, True))
+                self.assertEqual(item["price"] * item["quantity"], 9000)
+
+    def test_unit_product_needs_at_least_one_unit_and_can_be_edited(self):
+        dish_id = self.unit_dish()
         self.action("table_open", table_id="1", waiter="Prueba")
+        empty = self.action("item_add", table_id="1", menu_id=dish_id, quantity=1, modifiers=[])
+        self.assertEqual(empty.status_code, 400)
+
         added = self.action("item_add", table_id="1", menu_id=dish_id, quantity=1, modifiers=[
             {"group": "Para acompañar", "option": "gruesa", "quantity": 1},
-            {"group": "Para acompañar", "option": "bollito", "quantity": 1},
         ])
-        self.assertEqual(added.status_code, 200)
         item = added.json["tables"][0]["items"][0]
-        self.assertEqual(item["price"], 6000)
-
-        plain = self.action("item_add", table_id="1", menu_id=dish_id, quantity=1)
-        self.assertEqual(plain.json["tables"][0]["items"][1]["price"], 3000)
-
-        edited = self.action("item_edit", table_id="1", item_id=item["id"], menu_id=dish_id, quantity=2, modifiers=[
-            {"group": "Para acompañar", "option": "fina", "quantity": 3},
-        ])
-        self.assertEqual(edited.json["tables"][0]["items"][0]["price"], 9000)
-
-    def test_options_with_a_different_price_are_still_extras(self):
-        dish_id = self.variant_dish(base_price=3000, option_price=500)
-        self.action("table_open", table_id="1", waiter="Prueba")
-        added = self.action("item_add", table_id="1", menu_id=dish_id, quantity=1, modifiers=[
+        self.assertEqual(item["quantity"], 1)
+        edited = self.action("item_edit", table_id="1", item_id=item["id"], menu_id=dish_id, quantity=1, modifiers=[
             {"group": "Para acompañar", "option": "gruesa", "quantity": 2},
+            {"group": "Para acompañar", "option": "fina", "quantity": 2},
         ])
-        self.assertEqual(added.json["tables"][0]["items"][0]["price"], 4000)
+        edited_item = edited.json["tables"][0]["items"][0]
+        self.assertEqual((edited_item["quantity"], edited_item["price"]), (4, 3000))
+
+    def test_products_with_a_single_choice_group_keep_the_base_price_plus_extras(self):
+        combo = next(dish for dish in app.read_state()[0]["menu"] if dish["id"] == "menu-clasico")
+        self.assertFalse(app.is_unit_product(combo))
+        self.action("table_open", table_id="1", waiter="Prueba")
+        added = self.action("item_add", table_id="1", menu_id="menu-clasico", quantity=2, modifiers=[
+            {"group": "Infusión", "option": "Mate", "quantity": 1},
+            {"group": "Acompañamientos", "option": "Bollito", "quantity": 1},
+            {"group": "Agregados", "option": "Manteca", "quantity": 1},
+        ])
+        item = added.json["tables"][0]["items"][0]
+        self.assertEqual((item["quantity"], item["price"], item["unit_mode"]), (2, 4800, False))
+
+    def test_options_with_a_real_surcharge_are_not_units(self):
+        dish_id = self.unit_dish(option_price=500, name="Tortilla extra")
+        self.action("table_open", table_id="1", waiter="Prueba")
+        added = self.action("item_add", table_id="1", menu_id=dish_id, quantity=2, modifiers=[
+            {"group": "Para acompañar", "option": "gruesa", "quantity": 1},
+        ])
+        item = added.json["tables"][0]["items"][0]
+        self.assertEqual((item["quantity"], item["price"], item["unit_mode"]), (2, 3500, False))
 
 class SiteMenuTests(unittest.TestCase):
     def setUp(self):

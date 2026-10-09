@@ -39,7 +39,7 @@ function tableTotal(table) {
 
 function itemModifierParts(item) {
   return (item.modifiers || []).map((modifier) => {
-    const quantity = modifier.quantity * item.quantity;
+    const quantity = item.unit_mode ? modifier.quantity : modifier.quantity * item.quantity;
     return { group: String(modifier.group ?? ""), option: quantity > 1 ? `${quantity} × ${modifier.name}` : String(modifier.name ?? "") };
   });
 }
@@ -491,7 +491,7 @@ function modifierGroupEditor(groups) {
     <button class="text-button" type="button" data-group-action="add-option">＋ Agregar opción</button>
   </section>`;
   }).join("");
-  return `<div class="modifier-editor"><h3>Opciones para el pedido</h3><p class="modifier-help">Se muestran al elegir este producto. Usá un adicional de $0 para opciones incluidas; solo los agregados con recargo aumentan el precio. Si el adicional de todas las opciones es igual al precio del producto (por ejemplo, las variedades de una tortilla), cada opción elegida cuenta como una unidad y el precio base no se suma de nuevo. Con «Mostrar cuando» el grupo se abre recién al marcar la opción que lo activa, por ejemplo los acompañamientos al elegir la infusión.</p>${groupRows || `<p class="modifier-empty">Sin opciones configuradas.</p>`}<button class="button button-secondary" type="button" data-group-action="add-group">＋ Agregar grupo</button></div>`;
+  return `<div class="modifier-editor"><h3>Opciones para el pedido</h3><p class="modifier-help">Se muestran al elegir este producto. Usá un adicional de $0 para opciones incluidas; solo los agregados con recargo aumentan el precio. Si todos los grupos son de cantidades y sus opciones cuestan $0 o lo mismo que el producto (por ejemplo, las variedades de una tortilla), no se pide la cantidad aparte: cada unidad que se elija se cobra al precio del producto. Con «Mostrar cuando» el grupo se abre recién al marcar la opción que lo activa, por ejemplo los acompañamientos al elegir la infusión.</p>${groupRows || `<p class="modifier-empty">Sin opciones configuradas.</p>`}<button class="button button-secondary" type="button" data-group-action="add-group">＋ Agregar grupo</button></div>`;
 }
 
 function showProductDialog(dish = null) {
@@ -553,19 +553,21 @@ function showProductDialog(dish = null) {
   });
 }
 
-function isVariantGroup(dish, group) {
-  return group.selection === "quantity" && dish.price > 0 && group.options.length > 0 && group.options.every((option) => Number(option.price) === Number(dish.price));
+function isUnitProduct(dish) {
+  const groups = dish.modifier_groups || [];
+  return dish.price > 0 && groups.length > 0 && groups.every((group) => group.selection === "quantity" && group.options.every((option) => [0, Number(dish.price)].includes(Number(option.price))));
 }
 
 function showAddItemDialog(table, dish, item = null) {
   const groups = dish.modifier_groups || [];
+  const unitProduct = isUnitProduct(dish);
   const selectedModifiers = item?.modifiers || [];
   const modifierFields = groups.map((group, groupIndex) => {
     const condition = group.show_when || null;
     const wrapperAttributes = `data-modifier-wrapper data-modifier-group-name="${escapeHtml(group.name)}"${condition ? ` data-conditional-group data-when-group="${escapeHtml(condition.group)}" data-when-options="${escapeHtml(JSON.stringify(condition.options || []))}"` : ""}`;
     const conditionHint = condition ? `<small class="modifier-condition-hint">Se abre al elegir ${escapeHtml(condition.group)}</small>` : "";
     const options = group.options.map((option, optionIndex) => {
-      const surcharge = option.price ? ` · ${isVariantGroup(dish, group) ? "" : "+"}${money(option.price)}` : " · incluido";
+      const surcharge = unitProduct ? ` · ${money(dish.price)} c/u` : option.price ? ` · +${money(option.price)}` : " · incluido";
       return group.selection === "single"
         ? `<option value="${escapeHtml(option.name)}" ${selectedModifiers.some((modifier) => modifier.group === group.name && modifier.name === option.name) ? "selected" : ""}>${escapeHtml(option.name)}${surcharge}</option>`
         : `<div class="modifier-quantity-row"><span>${escapeHtml(option.name)}${surcharge}</span><div class="quantity-stepper modifier-stepper"><button class="quantity-step" type="button" data-quantity-step="-1" aria-label="Disminuir ${escapeHtml(option.name)}">−</button><input name="modifier-${groupIndex}-${optionIndex}" data-quantity-choice="${escapeHtml(option.name)}" type="number" min="0" max="99" value="${selectedModifiers.find((modifier) => modifier.group === group.name && modifier.name === option.name)?.quantity || 0}" inputmode="none" readonly aria-label="Cantidad de ${escapeHtml(option.name)}"><button class="quantity-step" type="button" data-quantity-step="1" aria-label="Aumentar ${escapeHtml(option.name)}">+</button></div></div>`;
@@ -574,8 +576,8 @@ function showAddItemDialog(table, dish, item = null) {
       ? `<label class="dialog-field modifier-selection" ${wrapperAttributes}>${escapeHtml(group.name)}${group.required ? " · obligatorio" : ""}${conditionHint}<select name="modifier-group-${groupIndex}" data-single-choice ${group.required ? 'data-required="true" required' : ""}><option value="">${group.required ? "Elegí una opción" : "Sin selección"}</option>${options}</select></label>`
       : `<fieldset class="modifier-selection" ${wrapperAttributes}><legend>${escapeHtml(group.name)}${group.required ? " · elegí al menos una" : ""}</legend>${conditionHint}${options}</fieldset>`;
   }).join("");
-  const quantityField = `<label class="dialog-field">Cantidad<div class="quantity-stepper"><button class="quantity-step" type="button" data-quantity-step="-1" aria-label="Menos">−</button><input name="quantity" type="number" min="1" max="99" value="${item?.quantity ?? 1}" inputmode="none" readonly required><button class="quantity-step" type="button" data-quantity-step="1" aria-label="Más">＋</button></div></label>`;
-  const body = `<div class="dialog-product-line"><strong>${escapeHtml(dish.name)}</strong><span>${money(dish.price)}</span></div>${quantityField}<p class="dialog-hint">${item ? "Los cambios se actualizarán también en cocina." : "Usá − y ＋ para elegir cuántas unidades querés agregar."}</p>${modifierFields}<label class="priority-field"><input name="priority" type="checkbox" ${item?.priority ? "checked" : ""}><span>Prioridad</span><small>Producto rápido de preparar</small></label><label class="dialog-field">Nota para cocina<textarea name="note" maxlength="160" placeholder="Ej.: sin azúcar, bien tostado">${escapeHtml(item?.note || "")}</textarea></label>`;
+  const quantityField = unitProduct ? "" : `<label class="dialog-field">Cantidad<div class="quantity-stepper"><button class="quantity-step" type="button" data-quantity-step="-1" aria-label="Menos">−</button><input name="quantity" type="number" min="1" max="99" value="${item?.quantity ?? 1}" inputmode="none" readonly required><button class="quantity-step" type="button" data-quantity-step="1" aria-label="Más">＋</button></div></label>`;
+  const body = `<div class="dialog-product-line"><strong>${escapeHtml(dish.name)}</strong><span>${money(dish.price)}</span></div>${quantityField}<p class="dialog-hint">${unitProduct ? "Elegí cuántas unidades de cada opción · cada una se cobra al precio del producto." : item ? "Los cambios se actualizarán también en cocina." : "Usá − y ＋ para elegir cuántas unidades querés agregar."}${unitProduct && item ? " Los cambios se actualizarán también en cocina." : ""}</p>${modifierFields}<label class="priority-field"><input name="priority" type="checkbox" ${item?.priority ? "checked" : ""}><span>Prioridad</span><small>Producto rápido de preparar</small></label><label class="dialog-field">Nota para cocina<textarea name="note" maxlength="160" placeholder="Ej.: sin azúcar, bien tostado">${escapeHtml(item?.note || "")}</textarea></label>`;
   showDialog({ eyebrow: table.name, title: item ? "Editar pedido" : "Agregar al pedido", body, submitLabel: item ? "Guardar cambios" : "Agregar", onSubmit: (data) => {
     const wrappers = [...dialogBody.querySelectorAll("[data-modifier-wrapper]")];
     const modifiers = [];
@@ -601,8 +603,12 @@ function showAddItemDialog(table, dish, item = null) {
       }
     });
     if (missingRequiredGroup) return false;
+    if (unitProduct && !modifiers.length) {
+      showToast(`Elegí cuántas unidades querés de ${dish.name}.`, true);
+      return false;
+    }
     const action = item
-      ? { type: "item_edit", table_id: table.id, item_id: item.id, menu_id: dish.id, quantity: Number(data.quantity), modifiers, note: data.note, priority: data.priority === "on", waiter: waiterInput.value.trim() || table.opened_by }
+      ? { type: "item_edit", table_id: table.id, item_id: item.id, menu_id: dish.id, quantity: Number(data.quantity) || 1, modifiers, note: data.note, priority: data.priority === "on", waiter: waiterInput.value.trim() || table.opened_by }
       : { type: "item_add", table_id: table.id, menu_id: dish.id, quantity: Number(data.quantity) || 1, modifiers, note: data.note, priority: data.priority === "on", waiter: waiterInput.value.trim() || table.opened_by };
     return sendAction(action, item ? `${dish.name} actualizado en cocina.` : `${dish.name} agregado.`);
   } });
