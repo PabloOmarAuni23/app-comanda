@@ -575,6 +575,41 @@ class ComandaWorkflowTests(unittest.TestCase):
         self.assertEqual(closed.json["pending_tickets"], [])
         self.assertEqual(closed.json["sales_closures"][-1]["total_amount"], 4000)
         self.assertEqual(closed.json["sales_closures"][-1]["tickets"], 1)
+    def variant_dish(self, base_price=3000, option_price=3000):
+        created = self.action("menu_add", name="Tortilla", category="Para acompañar", price=base_price, modifier_groups=[{
+            "name": "Para acompañar",
+            "selection": "quantity",
+            "required": False,
+            "options": [{"name": name, "price": option_price} for name in ("gruesa", "fina", "bollito", "sacramento")],
+        }])
+        return next(dish for dish in created.json["menu"] if dish["name"] == "Tortilla")["id"]
+
+    def test_variant_options_priced_like_the_product_count_as_units(self):
+        dish_id = self.variant_dish()
+        self.action("table_open", table_id="1", waiter="Prueba")
+        added = self.action("item_add", table_id="1", menu_id=dish_id, quantity=1, modifiers=[
+            {"group": "Para acompañar", "option": "gruesa", "quantity": 1},
+            {"group": "Para acompañar", "option": "bollito", "quantity": 1},
+        ])
+        self.assertEqual(added.status_code, 200)
+        item = added.json["tables"][0]["items"][0]
+        self.assertEqual(item["price"], 6000)
+
+        plain = self.action("item_add", table_id="1", menu_id=dish_id, quantity=1)
+        self.assertEqual(plain.json["tables"][0]["items"][1]["price"], 3000)
+
+        edited = self.action("item_edit", table_id="1", item_id=item["id"], menu_id=dish_id, quantity=2, modifiers=[
+            {"group": "Para acompañar", "option": "fina", "quantity": 3},
+        ])
+        self.assertEqual(edited.json["tables"][0]["items"][0]["price"], 9000)
+
+    def test_options_with_a_different_price_are_still_extras(self):
+        dish_id = self.variant_dish(base_price=3000, option_price=500)
+        self.action("table_open", table_id="1", waiter="Prueba")
+        added = self.action("item_add", table_id="1", menu_id=dish_id, quantity=1, modifiers=[
+            {"group": "Para acompañar", "option": "gruesa", "quantity": 2},
+        ])
+        self.assertEqual(added.json["tables"][0]["items"][0]["price"], 4000)
 
 class SiteMenuTests(unittest.TestCase):
     def setUp(self):

@@ -219,6 +219,20 @@ def modifier_visibility(groups, selected_by_group):
     return visible
 
 
+def is_variant_group(dish, group):
+    """Un grupo de cantidades cuyas opciones cuestan lo mismo que el producto son variantes del mismo:
+    cada opción elegida es una unidad y el precio base no se suma de nuevo."""
+    options = group.get("options", [])
+    base_price = dish.get("price", 0)
+    return group.get("selection") == "quantity" and base_price > 0 and bool(options) and all(option["price"] == base_price for option in options)
+
+
+def unit_price_for(dish, modifiers):
+    variant_groups = {group["name"] for group in dish.get("modifier_groups", []) if is_variant_group(dish, group)}
+    base_price = 0 if any(entry["group"] in variant_groups for entry in modifiers) else dish["price"]
+    return base_price + sum(entry["unit_price"] * entry["quantity"] for entry in modifiers)
+
+
 def select_modifiers(dish, value):
     groups = dish.get("modifier_groups", [])
     if not isinstance(value, list):
@@ -476,7 +490,7 @@ def mutate_state(action):
                 raise ValueError("Ese producto ya no está disponible.")
             quantity = max(1, min(int(action.get("quantity", 1)), 99))
             modifiers = select_modifiers(dish, action.get("modifiers", []))
-            unit_price = dish["price"] + sum(entry["unit_price"] * entry["quantity"] for entry in modifiers)
+            unit_price = unit_price_for(dish, modifiers)
             table["items"].append({
                 "id": str(uuid.uuid4()), "menu_id": dish["id"], "name": dish["name"], "price": unit_price,
                 "modifiers": modifiers,
@@ -554,7 +568,7 @@ def mutate_state(action):
                     edited_modifiers = select_modifiers(menu_item, action["modifiers"])
                 except ValueError as error:
                     raise ValueError(str(error)) from error
-                unit_price = menu_item["price"] + sum(entry["unit_price"] * entry["quantity"] for entry in edited_modifiers)
+                unit_price = unit_price_for(menu_item, edited_modifiers)
                 if len(edited_modifiers) != len(item["modifiers"]):
                     item["edited_by"] = str(action.get("waiter", "Equipo")).strip()[:40] or "Equipo"
                     item["edited_at"] = stamp

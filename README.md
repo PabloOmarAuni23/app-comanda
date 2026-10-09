@@ -51,6 +51,8 @@ Cada grupo puede marcarse como **condicional** con el campo *Mostrar cuando*: el
 
 La pantalla de Inicio resume las ventas del turno: **Ventas abiertas** (mesas con pedido sin cobrar: monto y unidades), **Ventas cerradas** (cobros desde el último cierre de turno: monto, cantidad de cobros y unidades), más lo que está en cocina y lo listo para retirar. Al cerrar el turno desde Estadística, el monto cobrado queda guardado en el cierre.
 
+Cuando todas las opciones de un grupo de cantidades cuestan lo mismo que el producto (por ejemplo, una tortilla de $ 3.000 con opciones gruesa, fina y bollito de $ 3.000), cada opción elegida cuenta como una unidad y el precio base no se suma de nuevo: dos opciones elegidas son $ 6.000. En cualquier otro caso el adicional se suma al precio del producto.
+
 La carta inicial es la de Las Palmeras Pan & Café (https://pabloomarauni23.github.io/PabloLangePage26/#carta), definida en `carta.py`: 37 productos en 7 categorías, con sus descripciones y precios. Los desayunos piden elegir la infusión incluida, y los *Sandwich especiales* quedan pausados (la página no los muestra). **Porción torta** y **Licuado** figuran como "Consultar" en la página, así que quedan con precio $ 0 hasta que se cargue desde Carta. Las bases ya existentes reemplazan su carta por esta una sola vez, conservando los datos de las mesas.
 
 Las mesas están en dos salones, que se eligen desde el menú superior (Inicio, Salón adentro, Salón afuera, Cocina, Carta): **Salón adentro** (Mesa 1 a 8) y **Salón afuera** (Mesa 9 a 16, desayunador D1 a D5 y sombrillas S1 y S2). Al agregar una mesa nueva se elige su salón, y la comanda de cocina muestra el salón de cada mesa. Las bases existentes se actualizan solas: conservan sus mesas y reciben las que falten.

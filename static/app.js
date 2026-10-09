@@ -491,7 +491,7 @@ function modifierGroupEditor(groups) {
     <button class="text-button" type="button" data-group-action="add-option">＋ Agregar opción</button>
   </section>`;
   }).join("");
-  return `<div class="modifier-editor"><h3>Opciones para el pedido</h3><p class="modifier-help">Se muestran al elegir este producto. Usá un adicional de $0 para opciones incluidas; solo los agregados con recargo aumentan el precio. Con «Mostrar cuando» el grupo se abre recién al marcar la opción que lo activa, por ejemplo los acompañamientos al elegir la infusión.</p>${groupRows || `<p class="modifier-empty">Sin opciones configuradas.</p>`}<button class="button button-secondary" type="button" data-group-action="add-group">＋ Agregar grupo</button></div>`;
+  return `<div class="modifier-editor"><h3>Opciones para el pedido</h3><p class="modifier-help">Se muestran al elegir este producto. Usá un adicional de $0 para opciones incluidas; solo los agregados con recargo aumentan el precio. Si el adicional de todas las opciones es igual al precio del producto (por ejemplo, las variedades de una tortilla), cada opción elegida cuenta como una unidad y el precio base no se suma de nuevo. Con «Mostrar cuando» el grupo se abre recién al marcar la opción que lo activa, por ejemplo los acompañamientos al elegir la infusión.</p>${groupRows || `<p class="modifier-empty">Sin opciones configuradas.</p>`}<button class="button button-secondary" type="button" data-group-action="add-group">＋ Agregar grupo</button></div>`;
 }
 
 function showProductDialog(dish = null) {
@@ -553,6 +553,10 @@ function showProductDialog(dish = null) {
   });
 }
 
+function isVariantGroup(dish, group) {
+  return group.selection === "quantity" && dish.price > 0 && group.options.length > 0 && group.options.every((option) => Number(option.price) === Number(dish.price));
+}
+
 function showAddItemDialog(table, dish, item = null) {
   const groups = dish.modifier_groups || [];
   const selectedModifiers = item?.modifiers || [];
@@ -561,7 +565,7 @@ function showAddItemDialog(table, dish, item = null) {
     const wrapperAttributes = `data-modifier-wrapper data-modifier-group-name="${escapeHtml(group.name)}"${condition ? ` data-conditional-group data-when-group="${escapeHtml(condition.group)}" data-when-options="${escapeHtml(JSON.stringify(condition.options || []))}"` : ""}`;
     const conditionHint = condition ? `<small class="modifier-condition-hint">Se abre al elegir ${escapeHtml(condition.group)}</small>` : "";
     const options = group.options.map((option, optionIndex) => {
-      const surcharge = option.price ? ` · +${money(option.price)}` : " · incluido";
+      const surcharge = option.price ? ` · ${isVariantGroup(dish, group) ? "" : "+"}${money(option.price)}` : " · incluido";
       return group.selection === "single"
         ? `<option value="${escapeHtml(option.name)}" ${selectedModifiers.some((modifier) => modifier.group === group.name && modifier.name === option.name) ? "selected" : ""}>${escapeHtml(option.name)}${surcharge}</option>`
         : `<div class="modifier-quantity-row"><span>${escapeHtml(option.name)}${surcharge}</span><div class="quantity-stepper modifier-stepper"><button class="quantity-step" type="button" data-quantity-step="-1" aria-label="Disminuir ${escapeHtml(option.name)}">−</button><input name="modifier-${groupIndex}-${optionIndex}" data-quantity-choice="${escapeHtml(option.name)}" type="number" min="0" max="99" value="${selectedModifiers.find((modifier) => modifier.group === group.name && modifier.name === option.name)?.quantity || 0}" inputmode="none" readonly aria-label="Cantidad de ${escapeHtml(option.name)}"><button class="quantity-step" type="button" data-quantity-step="1" aria-label="Aumentar ${escapeHtml(option.name)}">+</button></div></div>`;
