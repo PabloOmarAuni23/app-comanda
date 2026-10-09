@@ -123,6 +123,10 @@ h1, h2, h3 { font-family: 'Manrope', 'Avenir Next', sans-serif; }
 .order-note, .order-meta { color: var(--muted); font-size: 11px; }
 .order-note { margin-top: 4px; }
 .order-elapsed { margin-top: 6px; color: var(--muted); font-size: 12px; font-weight: 700; }
+.order-clock.clock-on-time { color: #79e6a8; background: #123024; border-color: #1f5a41; }
+.order-clock.clock-delayed { color: #ffd566; background: #3a3008; border-color: #6b5a12; }
+.order-clock.clock-very-late { color: #ffb07a; background: #40210d; border-color: #7a3f18; }
+.order-clock.clock-critical { color: #ff8f85; background: #421812; border-color: #8a2e24; }
 .order-clock { display: inline-block; min-width: 54px; padding: 1px 8px; border: 1px solid var(--line); border-radius: 6px; color: var(--yellow); background: #0e1112; font: 800 13px 'Manrope', sans-serif; font-variant-numeric: tabular-nums; text-align: center; }
 .order-price { font-weight: 700; font-size: 13px; white-space: nowrap; }
 .category-row { display: flex; gap: 7px; overflow-x: auto; margin: 0 0 16px; padding-bottom: 3px; }

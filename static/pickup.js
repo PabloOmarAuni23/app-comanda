@@ -37,9 +37,22 @@ function formatClock(startTimestamp, endTimestamp) {
   return hours ? `${hours}:${minutes}:${seconds}` : `${minutes}:${seconds}`;
 }
 
-function createClock(startTimestamp, endTimestamp) {
+function clockTone(startTimestamp, endTimestamp) {
+  const start = Date.parse(startTimestamp || "");
+  if (!Number.isFinite(start)) return "";
+  const end = endTimestamp ? Date.parse(endTimestamp) : Date.now();
+  const minutes = ((Number.isFinite(end) ? end : Date.now()) - start) / 60000;
+  if (minutes <= 15) return "clock-on-time";
+  if (minutes <= 25) return "clock-delayed";
+  if (minutes <= 35) return "clock-very-late";
+  return "clock-critical";
+}
+
+function createClock(startTimestamp, endTimestamp, colored = true) {
   const clock = document.createElement("span");
   clock.className = "order-clock";
+  clock.dataset.colored = colored ? "1" : "";
+  if (colored) clock.classList.add(clockTone(startTimestamp, endTimestamp));
   clock.dataset.start = startTimestamp || "";
   clock.dataset.end = endTimestamp || "";
   clock.textContent = formatClock(startTimestamp, endTimestamp);
@@ -49,7 +62,9 @@ function createClock(startTimestamp, endTimestamp) {
 
 function tickOrderClocks() {
   appRoot.querySelectorAll(".order-clock").forEach((clock) => {
-    if (!clock.dataset.end) clock.textContent = formatClock(clock.dataset.start, null);
+    if (clock.dataset.end) return;
+    clock.textContent = formatClock(clock.dataset.start, null);
+    if (clock.dataset.colored) clock.className = `order-clock ${clockTone(clock.dataset.start, null)}`;
   });
 }
 
@@ -166,7 +181,7 @@ function renderTableOrderStatus(table) {
         "Tiempo total ",
         createClock(item.sent_at, item.ready_at || null),
         " · esperando retiro ",
-        createClock(item.ready_at || item.sent_at, null),
+        createClock(item.ready_at || item.sent_at, null, false),
       );
     } else {
       const labels = { sent: "En cocina", preparing: "En preparación", suspended: "Demorado" };
