@@ -1,5 +1,6 @@
 const renderApplication = render;
 const renderOrderFlow = orderFlow;
+
 orderFlow = function (table) {
   return renderOrderFlow({
     ...table,
@@ -12,36 +13,72 @@ render = function () {
   renderPickupState();
 };
 
-function renderPickupState() {
-  if (!state || !currentRole) return;
+function elapsedMinutes(timestamp) {
+  const start = Date.parse(timestamp || "");
+  return Number.isFinite(start) ? Math.max(0, Math.floor((Date.now() - start) / 60000)) : null;
+}
 
-  const readyCount = state.tables.flatMap((table) => table.items)
-    .filter((item) => item.status === "ready" && !item.retrieved_at).length;
-  const homeReadyCount = appRoot.querySelector(".stats .stat:nth-child(4) .stat-value");
-  if (homeReadyCount) homeReadyCount.textContent = String(readyCount);
+function formatElapsed(minutes) {
+  if (minutes === null) return "Tiempo no disponible";
+  if (minutes < 60) return `${minutes} min`;
+  const hours = Math.floor(minutes / 60);
+  const remainder = minutes % 60;
+  return remainder ? `${hours} h ${remainder} min` : `${hours} h`;
+}
 
-  const readyTables = state.tables
+function readyPickupTables() {
+  return state.tables
     .filter((table) => table.status === "open")
-    .map((table) => ({ ...table, readyItems: table.items.filter((item) => item.status === "ready" && !item.retrieved_at) }))
+    .map((table) => ({
+      ...table,
+      readyItems: table.items.filter((item) => item.status === "ready" && !item.retrieved_at),
+    }))
     .filter((table) => table.readyItems.length);
-  const readyItems = readyTables.flatMap((table) => table.readyItems.map((item) => ({ table, item })));
+}
 
-  readyNoticeElement.hidden = currentRole !== "mozo" || readyItems.length === 0;
-  if (readyItems.length) {
-    const preview = readyItems.slice(0, 3)
-      .map(({ table, item }) => `${escapeHtml(table.name)} · ${item.quantity} × ${escapeHtml(item.name)}`)
-      .join(" &nbsp; | &nbsp; ");
-    const remaining = readyItems.length - Math.min(readyItems.length, 3);
-    const summary = `${readyTables.length} ${readyTables.length === 1 ? "mesa" : "mesas"} · ${readyItems.length} ${readyItems.length === 1 ? "producto listo" : "productos listos"} para retirar`;
-    readyNoticeElement.dataset.tableId = readyTables[0].id;
-    readyNoticeElement.setAttribute("aria-label", `${summary}. Ir a ${readyTables[0].name} para retirar el pedido.`);
-    readyNoticeElement.innerHTML = `<span class="ready-notice-icon" aria-hidden="true">!</span><span class="ready-notice-copy"><strong>¡Hay pedidos listos para retirar!</strong><span>${summary}</span><span class="ready-notice-items">${preview}${remaining ? ` &nbsp; | &nbsp; y ${remaining} más` : ""}</span></span><span class="ready-notice-action">Ir a buscar →</span>`;
-  } else {
-    readyNoticeElement.innerHTML = "";
-    delete readyNoticeElement.dataset.tableId;
-  }
+function renderReadyNotices(readyTables) {
+  readyNoticeElement.hidden = currentRole !== "mozo" || readyTables.length === 0;
+  readyNoticeElement.replaceChildren();
+  if (readyNoticeElement.hidden) return;
 
-  const table = activeView === "table-detail" ? state.tables.find((entry) => entry.id === activeTableId) : null;
+  const list = document.createElement("div");
+  list.className = "ready-notice-list";
+  readyTables.forEach((table) => {
+    const card = document.createElement("button");
+    card.type = "button";
+    card.className = "ready-notice-table";
+    card.dataset.readyTableId = table.id;
+    card.setAttribute("aria-label", `${table.name}: ir a retirar el pedido listo`);
+
+    const heading = document.createElement("strong");
+    heading.className = "ready-notice-table-name";
+    heading.textContent = table.name;
+    card.append(heading);
+
+    const products = document.createElement("span");
+    products.className = "ready-notice-items";
+    products.textContent = table.readyItems
+      .map((item) => `${item.quantity} × ${item.name}`)
+      .join(" · ");
+    card.append(products);
+
+    const timings = document.createElement("span");
+    timings.className = "ready-notice-timing";
+    timings.textContent = table.readyItems
+      .map((item) => `${item.name}: espera ${formatElapsed(elapsedMinutes(item.ready_at || item.sent_at))}`)
+      .join(" · ");
+    card.append(timings);
+
+    const action = document.createElement("span");
+    action.className = "ready-notice-action";
+    action.textContent = "Ver mesa →";
+    card.append(action);
+    list.append(card);
+  });
+  readyNoticeElement.append(list);
+}
+
+function renderTableOrderStatus(table) {
   const tableSection = appRoot.querySelector(".table-section");
   tableSection?.querySelector("#tablePickupNotice")?.remove();
   if (!table || !tableSection) return;
@@ -54,12 +91,12 @@ function renderPickupState() {
     notice.setAttribute("role", "status");
 
     const heading = document.createElement("strong");
-    heading.textContent = `¡Hay ${tableReadyItems.length === 1 ? "un pedido listo" : `${tableReadyItems.length} pedidos listos`} para retirar!`;
+    heading.textContent = `${tableReadyItems.length === 1 ? "Un pedido listo" : `${tableReadyItems.length} pedidos listos`} para retirar`;
     notice.append(heading);
 
-    const summary = document.createElement("span");
-    summary.textContent = tableReadyItems.map((item) => `${item.quantity} × ${item.name}`).join(" · ");
-    notice.append(summary);
+    const products = document.createElement("span");
+    products.textContent = tableReadyItems.map((item) => `${item.quantity} × ${item.name}`).join(" · ");
+    notice.append(products);
 
     const actions = document.createElement("div");
     actions.className = "table-pickup-actions";
@@ -77,18 +114,56 @@ function renderPickupState() {
     tableSection.insertBefore(notice, tableSection.querySelector(".order-list"));
   }
 
-  table.items.filter((item) => item.status === "ready" && item.retrieved_at).forEach((item) => {
+  table.items.forEach((item) => {
     const row = [...tableSection.querySelectorAll(".order-row")]
       .find((entry) => [...entry.querySelectorAll("[data-item-id]")].some((button) => button.dataset.itemId === item.id));
-    const status = row?.querySelector(".status");
-    if (!status) return;
-    const time = new Intl.DateTimeFormat("es-AR", { hour: "2-digit", minute: "2-digit" }).format(new Date(item.retrieved_at));
-    status.textContent = `Retirado${item.retrieved_by ? ` por ${item.retrieved_by}` : ""} · ${time}`;
+    if (!row) return;
+
+    const status = row.querySelector(".status");
+    if (status && item.status === "ready") {
+      if (item.retrieved_at) {
+        const time = new Intl.DateTimeFormat("es-AR", { hour: "2-digit", minute: "2-digit" }).format(new Date(item.retrieved_at));
+        status.textContent = `Retirado${item.retrieved_by ? ` por ${item.retrieved_by}` : ""} · ${time}`;
+      } else {
+        status.textContent = "Listo para retirar";
+      }
+    }
+
+    row.querySelector(".order-elapsed")?.remove();
+    if (!["sent", "preparing", "suspended", "ready"].includes(item.status) || item.status === "ready" && item.retrieved_at) return;
+
+    const sentMinutes = elapsedMinutes(item.sent_at);
+    const elapsed = document.createElement("div");
+    elapsed.className = "order-elapsed";
+    elapsed.dataset.sentAt = item.sent_at || "";
+    elapsed.dataset.readyAt = item.ready_at || "";
+    if (item.status === "ready") {
+      const readyMinutes = elapsedMinutes(item.ready_at || item.sent_at);
+      elapsed.textContent = `Tiempo total: ${formatElapsed(sentMinutes)} · esperando retiro: ${formatElapsed(readyMinutes)}`;
+    } else {
+      const labels = { sent: "En cocina", preparing: "En preparación", suspended: "Demorado" };
+      elapsed.textContent = `${labels[item.status]} · enviado hace ${formatElapsed(sentMinutes)}`;
+    }
+    row.querySelector(".order-meta")?.after(elapsed);
   });
 }
 
-readyNoticeElement.addEventListener("click", () => {
-  const tableId = readyNoticeElement.dataset.tableId;
+function renderPickupState() {
+  if (!state || !currentRole) return;
+
+  const readyTables = readyPickupTables();
+  const readyCount = readyTables.reduce((sum, table) => sum + table.readyItems.length, 0);
+  const homeReadyCount = appRoot.querySelector(".stats .stat:nth-child(4) .stat-value");
+  if (homeReadyCount) homeReadyCount.textContent = String(readyCount);
+  renderReadyNotices(readyTables);
+
+  const table = activeView === "table-detail" ? state.tables.find((entry) => entry.id === activeTableId) : null;
+  renderTableOrderStatus(table);
+}
+
+readyNoticeElement.addEventListener("click", (event) => {
+  const card = event.target.closest("[data-ready-table-id]");
+  const tableId = card?.dataset.readyTableId;
   if (!tableId || !state?.tables.some((table) => table.id === tableId)) return;
   activeTableId = tableId;
   activeView = "table-detail";
@@ -106,3 +181,7 @@ appRoot.addEventListener("click", async (event) => {
     waiter: waiterInput.value.trim() || "Equipo",
   }, "Pedido marcado como retirado.");
 });
+
+setInterval(() => {
+  if (state && currentRole) renderPickupState();
+}, 15000);

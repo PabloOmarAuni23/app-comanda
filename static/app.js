@@ -364,13 +364,6 @@ function renderKitchen() {
       const modifierLines = itemModifierLines(item);
       const nextStatus = item.status === "preparing" ? "ready" : "preparing";
       const nextLabel = nextStatus === "preparing" ? "Empezar" : "Terminar producto";
-      const retrieveDisabled = item.status !== "sent" && item.status !== "preparing";
-      const retrieveLabel = item.status === "ready" && item.retrieved_at
-        ? `Retirado ${kitchenSentTime(item.retrieved_at)}`
-        : item.status === "ready"
-          ? "Esperando retiro"
-          : "Retirar";
-      const retrieveDisabledAttr = item.status === "ready" && item.retrieved_at ? "disabled" : "";
       const priorityToggle = `<label class="priority-toggle"><input type="checkbox" data-action="item-priority" data-table-id="${escapeHtml(table.id)}" data-item-id="${escapeHtml(item.id)}" ${item.priority ? "checked" : ""}><span>Prioridad</span></label>`;
       const isCanceled = item.status === "canceled";
       const hasEditableControls = !isCanceled && (item.status === "sent" || item.status === "preparing" || item.status === "suspended" || item.status === "ready");
@@ -378,7 +371,7 @@ function renderKitchen() {
       const cancelButton = `<button class="kitchen-advance kitchen-cancel" type="button" title="Cancelar pedido" aria-label="Cancelar ${escapeHtml(item.name)}" data-action="item-cancel" data-table-id="${escapeHtml(table.id)}" data-item-id="${escapeHtml(item.id)}">✕</button>`;
       const statusControls = isCanceled
         ? `<span class="status canceled">Cancelado</span>`
-        : `<select class="kitchen-state-select" aria-label="Estado de ${escapeHtml(item.name)}" data-action="item-status-select" data-table-id="${escapeHtml(table.id)}" data-item-id="${escapeHtml(item.id)}">${optionMarkup}</select><button class="kitchen-advance" type="button" title="${nextLabel}" aria-label="${nextLabel}" data-action="item-status" data-table-id="${escapeHtml(table.id)}" data-item-id="${escapeHtml(item.id)}" data-status="${nextStatus}">▶</button><button class="kitchen-advance kitchen-retrieve" type="button" title="${retrieveLabel}" aria-label="${retrieveLabel}" data-action="order-retrieve" data-table-id="${escapeHtml(table.id)}" data-item-id="${escapeHtml(item.id)}" ${retrieveDisabledAttr ? "disabled" : ""}>${retrieveLabel}</button>`;
+        : `<select class="kitchen-state-select" aria-label="Estado de ${escapeHtml(item.name)}" data-action="item-status-select" data-table-id="${escapeHtml(table.id)}" data-item-id="${escapeHtml(item.id)}">${optionMarkup}</select><button class="kitchen-advance" type="button" title="${nextLabel}" aria-label="${nextLabel}" data-action="item-status" data-table-id="${escapeHtml(table.id)}" data-item-id="${escapeHtml(item.id)}" data-status="${nextStatus}">▶</button>`;
       return `<article class="ticket-item ${item.priority ? "ticket-priority" : ""} ${isCanceled ? "ticket-canceled" : ""}"><div class="ticket-product"><span class="ticket-item-quantity">${item.quantity}</span><div><strong>${escapeHtml(item.name)}</strong>${modifierLines.length ? `<p class="ticket-modifiers">${modifierLines.join("<br>")}</p>` : ""}${item.note ? `<p class="ticket-note">${escapeHtml(item.note)}</p>` : ""}</div></div><div class="ticket-item-controls">${isCanceled ? `<span class="status canceled">Cancelado</span>` : statusControls}</div><div class="ticket-item-priority">${isCanceled ? "" : priorityToggle}</div>${hasEditableControls ? editButton : ""}${hasEditableControls ? cancelButton : ""}</article>`;
     }).join("");
     return `<section class="kitchen-ticket"><header class="ticket-head ${timing.className}"><div class="ticket-heading-main"><div class="ticket-heading-top"><span class="ticket-sent-time">${kitchenSentTime(oldestItem.sent_at)}</span><span class="kitchen-timer" role="timer" aria-label="Pedido hace ${timing.minutes} minutos: ${timing.label}"><strong>${timing.minutes} min</strong></span></div><h2>${escapeHtml(table.name)}</h2><p>Principal · Atiende ${escapeHtml(table.opened_by)}${guestsSuffix(table)}</p></div><span class="status open">${items.length} prod.</span></header><div class="ticket-items">${renderedItems}</div><footer class="ticket-footer"><span class="ticket-footer-meta">${items.length} pendientes</span><button class="button button-finish-all" data-action="finish-ticket" data-table-id="${escapeHtml(table.id)}">Terminar todo</button></footer></section>`;
@@ -779,9 +772,6 @@ appRoot.addEventListener("click", async (event) => {
     openItemEditDialog(tableId, actionButton.dataset.itemId);
   }  if (actionButton.dataset.action === "item-status") {
     await sendAction({ type: "item_status", table_id: tableId, item_id: actionButton.dataset.itemId, status: actionButton.dataset.status });
-  }
-  if (actionButton.dataset.action === "order-retrieve") {
-    await sendAction({ type: "order_retrieve", table_id: tableId, item_id: actionButton.dataset.itemId }, "Producto retirado.");
   }
   if (actionButton.dataset.action === "sales-close") {
     const shift = actionButton.dataset.shift;

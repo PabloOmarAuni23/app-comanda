@@ -52,3 +52,5 @@ Cada grupo puede marcarse como **condicional** con el campo *Mostrar cuando*: el
 Desde el detalle de la mesa, el mozo puede editar o cancelar productos ya enviados a cocina; los cambios se reflejan también en la comanda de cocina. Los productos cancelados no suman al total ni a las ventas y se pueden reactivar desde la mesa.
 
 Cuando cocina termina un producto, queda como **Listo para retirar** y aparece un aviso global y dentro del pedido de su mesa. Al llevarlo, el mozo marca **Retirado** en esa mesa; el aviso desaparece y queda registrado quién lo retiró y a qué hora.
+
+Los avisos globales se separan por mesa para identificar a dónde corresponde cada pedido. En la mesa abierta, cada producto enviado muestra su estado y cuánto tiempo lleva en cocina; cuando está listo, también indica cuánto espera para ser retirado.

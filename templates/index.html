@@ -11,26 +11,16 @@
   <link rel="manifest" href="/manifest.json">
   <link rel="apple-touch-icon" sizes="180x180" href="/static/apple-touch-icon.png">
   <link rel="icon" href="/static/icon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="/static/style.css">
+  <link rel="stylesheet" href="/static/style.css?v=15">
   <style>
-    .ready-notice { position: sticky; top: 0; z-index: 2; width: min(1120px, calc(100% - 40px)); min-height: 82px; display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; align-items: center; gap: 14px; margin: 14px auto 0; padding: 12px 18px; border: 3px solid #8b241b; border-radius: 9px; color: #fff; background: #b74739; box-shadow: 0 8px 24px rgba(85, 24, 18, .28); cursor: pointer; text-align: left; }
+    .ready-notice { position: sticky; top: 0; z-index: 2; width: min(1120px, calc(100% - 40px)); margin: 14px auto 0; }
     .ready-notice[hidden] { display: none; }
-    .ready-notice-icon { width: 40px; height: 40px; display: grid; place-items: center; border: 2px solid currentColor; border-radius: 50%; font: 800 26px/1 'Manrope', sans-serif; }
-    .ready-notice-copy { display: grid; gap: 2px; min-width: 0; }
-    .ready-notice-copy strong { font: 800 17px/1.2 'Manrope', sans-serif; }
-    .ready-notice-copy > span { font-size: 12px; font-weight: 700; }
-    .ready-notice-items { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; opacity: .92; }
-    .ready-notice-action { padding: 9px 12px; border-radius: 5px; color: #71320c; background: #ffe0bf; font-size: 12px; font-weight: 800; white-space: nowrap; }
-    .ready-notice:hover { background: #a83a2e; }
     .order-row.ready-order { border-left: 4px solid #3ddc84; background: #0f2318; }
     @media (max-width: 760px) {
-      .ready-notice { top: 58px; width: calc(100% - 20px); min-height: 76px; grid-template-columns: 34px minmax(0, 1fr); gap: 9px; margin-top: 8px; padding: 9px 11px; border-width: 2px; }
-      .ready-notice-icon { width: 32px; height: 32px; font-size: 21px; }
-      .ready-notice-copy strong { font-size: 14px; }
-      .ready-notice-copy > span { font-size: 10px; }
-      .ready-notice-action { grid-column: 2; justify-self: start; padding: 5px 8px; font-size: 10px; }
+      .ready-notice { top: 58px; width: calc(100% - 20px); margin-top: 8px; }
+      .ready-notice-table { grid-template-columns: minmax(0, 1fr); padding: 10px 12px; }
+      .ready-notice-action { grid-column: 1; grid-row: auto; justify-self: start; padding: 5px 8px; font-size: 10px; }
     }
-    @media (max-width: 390px) { .ready-notice-items { max-width: 100%; } }
   </style>
   <title>Comanda | Bar</title>
 </head>
@@ -55,7 +45,7 @@
     <button class="nav-button" type="button" data-view="menu"><span aria-hidden="true">≡</span>Carta</button>
   </nav>
 
-  <button id="readyNotice" class="ready-notice" type="button" aria-live="assertive" hidden></button>
+  <section id="readyNotice" class="ready-notice" aria-label="Pedidos listos para retirar" aria-live="assertive" hidden></section>
 
   <main id="app" class="page-content" aria-live="polite">
     <div class="loading-state"><span class="loader"></span>Conectando con la comanda…</div>
