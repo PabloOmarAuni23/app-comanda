@@ -275,10 +275,11 @@ function renderStatistics() {
     <section class="section-panel sales-history"><div class="section-title"><h2>Últimos cierres</h2></div>${history || `<p class="order-meta">Todavía no hay cierres guardados.</p>`}</section>`;
 }
 
-const TABLE_ZONES = ["Salón adentro", "Salón afuera", "Desayunador", "Sombrillas", "Otras"];
+const TABLE_ZONES = ["Salón adentro", "Salón afuera"];
+let activeZone = TABLE_ZONES[0];
 
 function tableZone(table) {
-  return TABLE_ZONES.includes(table.zone) ? table.zone : "Otras";
+  return TABLE_ZONES.includes(table.zone) ? table.zone : "Salón afuera";
 }
 
 function renderTables() {
@@ -289,13 +290,14 @@ function renderTables() {
     const caption = table.status === "open" ? `Atiende ${table.opened_by}${guestsSuffix(table)}` : statusLabel(table.status);
     return `<button class="table-tile ${table.status}" data-table="${escapeHtml(table.id)}"><span class="status ${table.status}">${statusLabel(table.status)}</span><strong>${escapeHtml(table.name)}</strong><span class="table-detail">${escapeHtml(description)}</span><span class="table-detail">${escapeHtml(caption)}</span>${table.status === "open" ? orderFlow(table) : ""}</button>`;
   };
-  const zoneSections = TABLE_ZONES.map((zone) => {
+  const zoneTabs = TABLE_ZONES.map((zone) => {
     const zoneTables = state.tables.filter((table) => tableZone(table) === zone);
-    if (!zoneTables.length) return "";
     const zoneOpen = zoneTables.filter((table) => table.status === "open").length;
-    return `<section class="table-zone"><div class="table-zone-heading"><h2>${escapeHtml(zone)}</h2><span>${zoneOpen} de ${zoneTables.length} ocupadas</span></div><div class="table-grid">${zoneTables.map(renderTile).join("")}</div></section>`;
+    const selected = zone === activeZone;
+    return `<button class="zone-tab ${selected ? "active" : ""}" type="button" role="tab" aria-selected="${selected}" data-zone-tab="${escapeHtml(zone)}"><strong>${escapeHtml(zone)}</strong><span>${zoneOpen} de ${zoneTables.length} ocupadas</span></button>`;
   }).join("");
-  appRoot.innerHTML = `${pageHeading("Servicio", "Mesas", `${openCount} abiertas · tocá una mesa para abrirla o ver el pedido.`, createButton)}${zoneSections}`;
+  const zoneTiles = state.tables.filter((table) => tableZone(table) === activeZone).map(renderTile).join("");
+  appRoot.innerHTML = `${pageHeading("Servicio", "Mesas", `${openCount} abiertas · tocá una mesa para abrirla o ver el pedido.`, createButton)}<div class="zone-layout"><div class="zone-tabs" role="tablist" aria-label="Salones">${zoneTabs}</div><div class="table-grid">${zoneTiles}</div></div>`;
 }
 
 function renderTableDetail() {
@@ -306,6 +308,7 @@ function renderTableDetail() {
     return;
   }
   if (table.status !== "open") { activeView = "tables"; renderTables(); return; }
+  activeZone = tableZone(table);
   const categories = ["Todas", ...new Set(state.menu.filter((dish) => dish.available).map((dish) => dish.category))];
   if (!categories.includes(activeCategory)) activeCategory = "Todas";
   const dishes = state.menu.filter((dish) => dish.available && (activeCategory === "Todas" || dish.category === activeCategory));
@@ -725,6 +728,12 @@ appRoot.addEventListener("click", async (event) => {
       activeView = "table-detail";
       render();
     }
+    return;
+  }
+  const zoneTab = event.target.closest("[data-zone-tab]");
+  if (zoneTab) {
+    activeZone = zoneTab.dataset.zoneTab;
+    renderTables();
     return;
   }
   const productButton = event.target.closest("[data-add-product]");

@@ -496,9 +496,11 @@ class ComandaWorkflowTests(unittest.TestCase):
         for table in tables:
             by_zone.setdefault(table["zone"], []).append(table["name"])
         self.assertEqual(by_zone["Salón adentro"], [f"Mesa {number}" for number in range(1, 9)])
-        self.assertEqual(by_zone["Salón afuera"], [f"Mesa {number}" for number in range(9, 17)])
-        self.assertEqual(by_zone["Desayunador"], [f"D{number}" for number in range(1, 6)])
-        self.assertEqual(by_zone["Sombrillas"], ["S1", "S2"])
+        self.assertEqual(set(by_zone), {"Salón adentro", "Salón afuera"})
+        self.assertEqual(
+            by_zone["Salón afuera"],
+            [f"Mesa {number}" for number in range(9, 17)] + [f"D{number}" for number in range(1, 6)] + ["S1", "S2"],
+        )
 
     def test_existing_state_gets_zones_and_missing_tables(self):
         with app.closing(app.connect_db()) as connection, connection:
@@ -506,7 +508,7 @@ class ComandaWorkflowTests(unittest.TestCase):
                 "_migrations": ["classic-combo-v1", "classic-combo-v2"],
                 "tables": [
                     {"id": "1", "name": "Mesa 1", "status": "open", "opened_by": "Ana", "opened_at": None, "guests": 2, "items": []},
-                    {"id": "custom", "name": "Patio", "status": "free", "opened_by": "", "opened_at": None, "guests": None, "items": []},
+                    {"id": "custom", "name": "Patio", "zone": "Otras", "status": "free", "opened_by": "", "opened_at": None, "guests": None, "items": []},
                 ],
                 "pending_sales": [],
                 "sales_closures": [],
@@ -516,7 +518,7 @@ class ComandaWorkflowTests(unittest.TestCase):
         tables = {table["name"]: table for table in self.client.get("/api/state").json["tables"]}
         self.assertEqual(tables["Mesa 1"]["zone"], "Salón adentro")
         self.assertEqual(tables["Mesa 1"]["status"], "open")
-        self.assertEqual(tables["Patio"]["zone"], "Otras")
+        self.assertEqual(tables["Patio"]["zone"], "Salón afuera")
         self.assertEqual(len(tables), 24)
         self.assertIn("S2", tables)
 
@@ -525,4 +527,15 @@ class ComandaWorkflowTests(unittest.TestCase):
         self.assertEqual(created.status_code, 200)
         self.assertEqual(created.json["tables"][-1]["zone"], "Salón afuera")
         fallback = self.action("table_create", name="Rincón", zone="inexistente")
-        self.assertEqual(fallback.json["tables"][-1]["zone"], "Otras")
+        self.assertEqual(fallback.json["tables"][-1]["zone"], "Salón afuera")
+
+    def test_old_four_zone_layout_is_collapsed_to_two_salons(self):
+        with app.closing(app.connect_db()) as connection, connection:
+            state = app.json.loads(connection.execute("SELECT document FROM app_state WHERE id = 1").fetchone()["document"])
+            old_zones = {"D1": "Desayunador", "S1": "Sombrillas", "Patio": "Otras", "Mesa 9": "Salón afuera", "Mesa 2": "Salón adentro"}
+            state["tables"] = [app.new_table(name.lower(), name, zone) for name, zone in old_zones.items()]
+            state["_migrations"] = ["classic-combo-v1", "classic-combo-v2", "zones-v1"]
+            connection.execute("UPDATE app_state SET document = ? WHERE id = 1", (app.json.dumps(state),))
+        tables = {table["name"]: table["zone"] for table in self.client.get("/api/state").json["tables"]}
+        self.assertEqual(tables["Mesa 2"], "Salón adentro")
+        self.assertEqual({tables[name] for name in ("D1", "S1", "Patio", "Mesa 9")}, {"Salón afuera"})

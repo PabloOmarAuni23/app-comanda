@@ -426,8 +426,15 @@ h1, h2, h3 { font-family: 'Manrope', 'Avenir Next', sans-serif; }
 .sound-button { font-size: 18px; }
 .sound-button.sound-needs-tap { border-color: var(--yellow); background: #33270a; animation: sound-pulse 1.4s ease-in-out infinite; }
 @keyframes sound-pulse { 50% { box-shadow: 0 0 0 5px rgba(245,195,79,.25); } }
-.table-zone { margin-top: 22px; }
-.table-zone:first-of-type { margin-top: 6px; }
-.table-zone-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin: 0 0 10px; padding-bottom: 8px; border-bottom: 1px solid var(--line); }
-.table-zone-heading h2 { margin: 0; font: 800 17px 'Manrope', sans-serif; }
-.table-zone-heading span { color: var(--muted); font-size: 12px; font-weight: 700; }
+.zone-layout { display: grid; grid-template-columns: 190px minmax(0, 1fr); align-items: start; gap: 18px; }
+.zone-tabs { position: sticky; top: 12px; display: grid; gap: 8px; }
+.zone-tab { display: grid; gap: 3px; padding: 14px 15px; border: 1px solid var(--line); border-radius: 8px; color: var(--ink); background: var(--surface); cursor: pointer; text-align: left; }
+.zone-tab strong { font: 800 15px 'Manrope', sans-serif; }
+.zone-tab span { color: var(--muted); font-size: 12px; font-weight: 700; }
+.zone-tab.active { border-color: var(--green); color: #05271b; background: var(--green); }
+.zone-tab.active span { color: #0b3d2b; }
+@media (max-width: 760px) {
+  .zone-layout { grid-template-columns: 1fr; gap: 12px; }
+  .zone-tabs { position: static; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .zone-tab { padding: 11px 12px; }
+}
