@@ -422,3 +422,7 @@ h1, h2, h3 { font-family: 'Manrope', 'Avenir Next', sans-serif; }
   .ticket-footer-meta { font-size: 12px; }
   .button-finish-all { min-height: 36px; padding: 0 14px; font-size: 12px; }
 }
+.sound-button[hidden] { display: none; }
+.sound-button { font-size: 18px; }
+.sound-button.sound-needs-tap { border-color: var(--yellow); background: #33270a; animation: sound-pulse 1.4s ease-in-out infinite; }
+@keyframes sound-pulse { 50% { box-shadow: 0 0 0 5px rgba(245,195,79,.25); } }

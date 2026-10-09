@@ -1,5 +1,5 @@
-const CACHE_NAME = "comanda-shell-v21";
-const APP_SHELL = ["/", "/static/style.css?v=21", "/static/app.js?v=21", "/static/pickup.js?v=21", "/static/icon.svg", "/static/icon-192.png", "/static/icon-512.png", "/static/apple-touch-icon.png", "/manifest.json"];
+const CACHE_NAME = "comanda-shell-v23";
+const APP_SHELL = ["/", "/static/style.css?v=23", "/static/app.js?v=23", "/static/pickup.js?v=23", "/static/alerts.js?v=23", "/static/icon.svg", "/static/icon-192.png", "/static/icon-512.png", "/static/apple-touch-icon.png", "/manifest.json"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL)));
