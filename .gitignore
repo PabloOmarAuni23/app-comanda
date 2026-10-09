@@ -4,3 +4,5 @@ instance/
 .venv/
 venv/
 .env
+.deps-instaladas
+respaldos/

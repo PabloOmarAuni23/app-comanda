@@ -27,6 +27,19 @@ La base local se crea en `instance/comanda.sqlite3`. Para probar desde otro tel�
 
 Todos los teléfonos que abran la misma URL comparten el estado actual en el servidor. **Atención:** el plan gratuito de Render duerme después de 15 minutos sin visitas y borra sus archivos locales cada vez que duerme, se reinicia o se vuelve a desplegar, así que sin base de datos se pierden la carta, las mesas y las ventas. La primera visita tras dormir puede tardar alrededor de un minuto.
 
+### Usar en una PC del bar (recomendado, sin internet ni costo)
+
+Los datos se guardan en el disco de la PC (`instance\comanda.sqlite3`) y no se pierden al apagar o reiniciar.
+
+1. Instalá [Python](https://www.python.org/downloads/) en la PC, marcando **Add python.exe to PATH**.
+2. Descomprimí `app-comanda-source.zip` en una carpeta, por ejemplo `C:\comanda`.
+3. Doble clic en **`iniciar-comanda.bat`**. La primera vez instala lo necesario (hace falta internet solo ese momento). Después muestra las direcciones para abrir la comanda: `http://localhost:8000` en la PC y algo como `http://192.168.1.20:8000` en los teléfonos. No cierres esa ventana.
+4. Si Windows pregunta por el firewall, permití el acceso en **redes privadas**.
+5. Los teléfonos tienen que estar en el **mismo WiFi** que la PC. En el router conviene reservar una IP fija para la PC, así la dirección no cambia. Con esa dirección (http) no se puede "instalar" la app, pero se puede agregar un acceso directo a la pantalla de inicio del navegador.
+6. Para que arranque sola al prender la PC, ejecutá una vez **`iniciar-con-windows.bat`**.
+7. **`respaldar-datos.bat`** copia la base a la carpeta `respaldos` con fecha y hora. Para restaurar, cerrá la comanda y copiá ese archivo sobre `instance\comanda.sqlite3`.
+8. Para actualizar la app, reemplazá los archivos por los de la versión nueva sin borrar la carpeta `instance`.
+
 ### Guardar los datos (gratis)
 
 La app guarda todo en PostgreSQL cuando existe la variable `DATABASE_URL`; sin ella usa un archivo SQLite local (que sirve en una PC, pero no en Render gratuito). Para que los datos queden guardados:
