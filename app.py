@@ -2,12 +2,15 @@ import json
 import os
 import re
 import sqlite3
+import unicodedata
 import uuid
 from contextlib import closing
 from datetime import datetime, timezone
 from pathlib import Path
 
 from flask import Flask, jsonify, render_template, request
+
+from carta import CARTA_SECTIONS, INFUSION_EXTRA_PRODUCTS, INFUSION_OPTIONS
 
 
 app = Flask(__name__)
@@ -68,6 +71,35 @@ def default_classic_combo():
             },
         ],
     }
+
+
+def menu_slug(value):
+    ascii_text = unicodedata.normalize("NFKD", str(value or "")).encode("ascii", "ignore").decode("ascii")
+    return re.sub(r"[^a-z0-9]+", "-", ascii_text.lower()).strip("-")
+
+
+def build_site_menu(previous_menu=()):
+    previous_ids = {menu_slug(dish.get("name", "")): str(dish["id"]) for dish in previous_menu if dish.get("id")}
+    menu = []
+    used_ids = set()
+    for category, with_infusion, available, products in CARTA_SECTIONS:
+        for name, description, price in products:
+            key = menu_slug(name)
+            dish_id = "menu-clasico" if key == "clasico" else previous_ids.get(key) or f"menu-{key}"
+            if dish_id in used_ids:
+                dish_id = f"{dish_id}-{len(menu)}"
+            used_ids.add(dish_id)
+            if key == "clasico":
+                groups = default_classic_combo()["modifier_groups"]
+            elif with_infusion or name in INFUSION_EXTRA_PRODUCTS:
+                groups = [{"name": "Infusión", "selection": "single", "required": True, "options": [{"name": option, "price": 0} for option in INFUSION_OPTIONS]}]
+            else:
+                groups = []
+            menu.append({
+                "id": dish_id, "name": name, "description": description, "category": category,
+                "price": price, "available": available, "modifier_groups": groups,
+            })
+    return menu
 
 
 def make_classic_combo_conditional(state):
@@ -315,19 +347,11 @@ def normalize_zones(state):
 
 def initial_state():
     return {
-        "_migrations": ["classic-combo-v1", "classic-combo-v2", "zones-v1", "zones-v2"],
+        "_migrations": ["classic-combo-v1", "classic-combo-v2", "zones-v1", "zones-v2", "carta-las-palmeras-v1"],
         "tables": default_tables(),
         "pending_sales": [],
         "sales_closures": [],
-        "menu": [
-            {"id": "menu-te", "name": "Té", "description": "Consultar variedades", "category": "Infusiones", "price": 2000, "available": True},
-            {"id": "menu-cafe", "name": "Café", "description": "Café en jarrito", "category": "Infusiones", "price": 1800, "available": True},
-            {"id": "menu-jamon", "name": "Jamón y queso", "description": "Tostado en pan árabe o miga", "category": "Para acompañar", "price": 4500, "available": True},
-            {"id": "menu-ternera", "name": "Ternera y queso", "description": "Tostado en pan árabe", "category": "Para acompañar", "price": 6000, "available": True},
-            {"id": "menu-factura", "name": "Factura / medialuna", "description": "Factura o medialuna", "category": "Para acompañar", "price": 700, "available": True},
-            {"id": "menu-licuado", "name": "Licuados", "description": "Fruta de estación", "category": "Bebidas", "price": 3000, "available": True},
-            default_classic_combo(),
-        ],
+        "menu": build_site_menu(),
     }
 
 
@@ -375,6 +399,10 @@ def ensure_existing_state(connection):
         if "zones-v2" not in migrations:
             normalize_zones(state)
             migrations.append("zones-v2")
+            updated = True
+        if "carta-las-palmeras-v1" not in migrations:
+            state["menu"] = build_site_menu(state.get("menu", []))
+            migrations.append("carta-las-palmeras-v1")
             updated = True
         state["_migrations"] = migrations
         if updated:

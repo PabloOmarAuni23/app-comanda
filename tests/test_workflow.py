@@ -6,6 +6,14 @@ from unittest.mock import patch
 import app
 
 
+SAMPLE_MENU = [
+    {"id": "menu-te", "name": "Té", "description": "Consultar variedades", "category": "Infusiones", "price": 2000, "available": True},
+    {"id": "menu-cafe", "name": "Café", "description": "Café en jarrito", "category": "Infusiones", "price": 1800, "available": True},
+    {"id": "menu-jamon", "name": "Jamón y queso", "description": "Tostado en pan árabe o miga", "category": "Para acompañar", "price": 4500, "available": True},
+    {"id": "menu-licuado", "name": "Licuados", "description": "Fruta de estación", "category": "Bebidas", "price": 3000, "available": True},
+]
+
+
 class ComandaWorkflowTests(unittest.TestCase):
     def setUp(self):
         self.temporary_directory = tempfile.TemporaryDirectory()
@@ -14,6 +22,16 @@ class ComandaWorkflowTests(unittest.TestCase):
         self.database_patch.start()
         app.initialize_db()
         self.client = app.app.test_client()
+        self.use_sample_menu()
+
+    def use_sample_menu(self):
+        with app.closing(app.connect_db()) as connection, connection:
+            state = app.json.loads(connection.execute("SELECT document FROM app_state WHERE id = 1").fetchone()["document"])
+            combo = app.default_classic_combo()
+            combo["price"] = 4500
+            combo["category"] = "Combos"
+            state["menu"] = [dict(dish) for dish in SAMPLE_MENU] + [combo]
+            connection.execute("UPDATE app_state SET document = ? WHERE id = 1", (app.json.dumps(state, ensure_ascii=False),))
 
     def tearDown(self):
         self.database_patch.stop()
@@ -539,3 +557,51 @@ class ComandaWorkflowTests(unittest.TestCase):
         tables = {table["name"]: table["zone"] for table in self.client.get("/api/state").json["tables"]}
         self.assertEqual(tables["Mesa 2"], "Salón adentro")
         self.assertEqual({tables[name] for name in ("D1", "S1", "Patio", "Mesa 9")}, {"Salón afuera"})
+
+
+class SiteMenuTests(unittest.TestCase):
+    def setUp(self):
+        self.temporary_directory = tempfile.TemporaryDirectory()
+        database_path = Path(self.temporary_directory.name) / "test.sqlite3"
+        self.database_patch = patch.object(app, "DATABASE_PATH", database_path)
+        self.database_patch.start()
+        app.initialize_db()
+        self.client = app.app.test_client()
+
+    def tearDown(self):
+        self.database_patch.stop()
+        self.temporary_directory.cleanup()
+
+    def menu(self):
+        return {dish["name"]: dish for dish in self.client.get("/api/state").json["menu"]}
+
+    def test_default_menu_is_the_las_palmeras_carta(self):
+        menu = self.menu()
+        self.assertEqual(len(menu), 37)
+        self.assertEqual(len({dish["id"] for dish in menu.values()}), 37)
+        self.assertEqual(menu["Capuchino"]["price"], 3000)
+        self.assertEqual(menu["Avocado"]["description"], "Pan de masa madre, palta y huevo poché. Incluye infusión")
+        self.assertEqual(menu["Gaseosa 1500 cc"]["category"], "Bebidas en general")
+        self.assertEqual(menu["Clásico"]["id"], "menu-clasico")
+        self.assertEqual([group["name"] for group in menu["Clásico"]["modifier_groups"]], ["Infusión", "Acompañamientos", "Agregados"])
+
+    def test_breakfasts_require_an_infusion_and_special_sandwiches_are_paused(self):
+        menu = self.menu()
+        group = menu["Energético"]["modifier_groups"][0]
+        self.assertEqual((group["name"], group["required"], group["selection"]), ("Infusión", True, "single"))
+        self.assertFalse(menu["Palmeras Perú"]["available"])
+        self.assertFalse(menu["Palmeras San Martín"]["available"])
+
+    def test_existing_menu_is_replaced_once_keeping_ids_of_matching_products(self):
+        with app.closing(app.connect_db()) as connection, connection:
+            state = app.json.loads(connection.execute("SELECT document FROM app_state WHERE id = 1").fetchone()["document"])
+            state["menu"] = [{"id": "viejo-jamon", "name": "Jamón y queso", "description": "", "category": "X", "price": 1, "available": True}]
+            state["_migrations"] = [name for name in state["_migrations"] if name != "carta-las-palmeras-v1"]
+            connection.execute("UPDATE app_state SET document = ? WHERE id = 1", (app.json.dumps(state, ensure_ascii=False),))
+        menu = self.menu()
+        self.assertEqual(len(menu), 37)
+        self.assertEqual(menu["Jamón y queso"]["id"], "viejo-jamon")
+        self.assertEqual(menu["Jamón y queso"]["price"], 3500)
+        again = self.client.post("/api/action", json={"type": "menu_add", "name": "Nuevo", "category": "X", "price": 100})
+        self.assertEqual(len(again.json["menu"]), 38)
+        self.assertEqual(len(self.menu()), 38)
