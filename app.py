@@ -368,6 +368,7 @@ def normalize_zones(state):
 def initial_state():
     return {
         "_migrations": ["classic-combo-v1", "classic-combo-v2", "zones-v1", "zones-v2", "carta-las-palmeras-v1"],
+        "shift": None,
         "tables": default_tables(),
         "pending_sales": [],
         "sales_closures": [],
@@ -448,6 +449,7 @@ def read_state():
     state.setdefault("pending_sales", [])
     state.setdefault("sales_closures", [])
     state.setdefault("pending_tickets", [])
+    state.setdefault("shift", None)
     return state, updated_at
 
 
@@ -458,6 +460,7 @@ def mutate_state(action):
         state.setdefault("pending_sales", [])
         state.setdefault("sales_closures", [])
         state.setdefault("pending_tickets", [])
+        state.setdefault("shift", None)
         tables = state["tables"]
         menu = state["menu"]
         action_type = action.get("type")
@@ -479,6 +482,8 @@ def mutate_state(action):
             tables.append(new_table(str(uuid.uuid4()), name, zone if zone in ZONES else ZONE_OUTSIDE))
         elif action_type == "table_open":
             table = find_table()
+            if state["shift"] is None:
+                raise ValueError("Iniciá el turno antes de abrir una mesa.")
             if table["status"] != "free":
                 raise ValueError("Esta mesa ya está ocupada.")
             try:
@@ -628,15 +633,31 @@ def mutate_state(action):
                 "paid_at": stamp,
             })
             table.update(status="cleaning", paid_at=stamp)
-        elif action_type == "sales_close":
+        elif action_type == "shift_start":
             shift = str(action.get("shift", ""))
             if shift not in {"morning", "afternoon"}:
                 raise ValueError("Elegí un turno válido.")
-            if not state["pending_sales"]:
-                raise ValueError("No hay unidades vendidas pendientes para cerrar.")
+            if state["shift"] is not None:
+                raise ValueError("Ya hay un turno en curso.")
+            state["shift"] = {
+                "type": shift,
+                "started_at": stamp,
+                "started_by": str(action.get("waiter", "")).strip()[:40],
+            }
+        elif action_type == "shift_close":
+            if state["shift"] is None:
+                raise ValueError("No hay un turno en curso.")
+            unpaid = [entry["name"] for entry in tables if entry["status"] == "open" and any(item["status"] != "canceled" for item in entry["items"])]
+            if unpaid:
+                raise ValueError(f"Hay mesas abiertas sin cobrar: {', '.join(unpaid)}. Cobralas o cancelá sus productos antes de cerrar el turno.")
+            for entry in tables:
+                if entry["status"] in {"open", "cleaning"}:
+                    entry.update(status="free", opened_by="", opened_at=None, paid_at=None, guests=None, items=[])
             closure = {
                 "id": str(uuid.uuid4()),
-                "shift": shift,
+                "shift": state["shift"]["type"],
+                "started_at": state["shift"]["started_at"],
+                "started_by": state["shift"].get("started_by", ""),
                 "closed_at": stamp,
                 "items": [dict(item) for item in state["pending_sales"]],
                 "total_units": sum(int(item["quantity"]) for item in state["pending_sales"]),
@@ -646,6 +667,7 @@ def mutate_state(action):
             state["sales_closures"].append(closure)
             state["pending_sales"] = []
             state["pending_tickets"] = []
+            state["shift"] = None
         elif action_type == "table_clean":
             table = find_table()
             if table["status"] != "cleaning":

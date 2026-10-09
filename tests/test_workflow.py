@@ -23,6 +23,7 @@ class ComandaWorkflowTests(unittest.TestCase):
         app.initialize_db()
         self.client = app.app.test_client()
         self.use_sample_menu()
+        self.action("shift_start", shift="morning", waiter="Prueba")
 
     def use_sample_menu(self):
         with app.closing(app.connect_db()) as connection, connection:
@@ -570,7 +571,7 @@ class ComandaWorkflowTests(unittest.TestCase):
         self.assertEqual(len(tickets), 1)
         self.assertEqual((tickets[0]["table_name"], tickets[0]["total"], tickets[0]["units"]), ("Mesa 1", 4000, 2))
 
-        closed = self.action("sales_close", shift="morning")
+        closed = self.action("shift_close")
         self.assertEqual(closed.status_code, 200)
         self.assertEqual(closed.json["pending_tickets"], [])
         self.assertEqual(closed.json["sales_closures"][-1]["total_amount"], 4000)
@@ -636,6 +637,45 @@ class ComandaWorkflowTests(unittest.TestCase):
         ])
         item = added.json["tables"][0]["items"][0]
         self.assertEqual((item["quantity"], item["price"], item["unit_mode"]), (2, 3500, False))
+    def test_shift_must_be_started_before_opening_tables_and_closed_to_finish(self):
+        self.action("shift_close")
+        blocked = self.action("table_open", table_id="1", waiter="Prueba")
+        self.assertEqual(blocked.status_code, 400)
+        self.assertEqual(self.action("shift_start", shift="evening").status_code, 400)
+
+        started = self.action("shift_start", shift="afternoon", waiter="Ana")
+        self.assertEqual((started.status_code, started.json["shift"]["type"], started.json["shift"]["started_by"]), (200, "afternoon", "Ana"))
+        self.assertEqual(self.action("shift_start", shift="morning").status_code, 400)
+        self.assertEqual(self.action("table_open", table_id="1", waiter="Ana").status_code, 200)
+
+    def test_shift_cannot_close_with_unpaid_tables_and_resets_everything_when_closed(self):
+        self.action("table_open", table_id="1", waiter="Prueba")
+        self.action("item_add", table_id="1", menu_id="menu-te", quantity=1)
+        self.action("table_open", table_id="2", waiter="Prueba")
+        blocked = self.action("shift_close")
+        self.assertEqual(blocked.status_code, 400)
+        self.assertIn("Mesa 1", blocked.json["error"])
+
+        sent = self.action("order_send", table_id="1")
+        item_id = sent.json["tables"][0]["items"][0]["id"]
+        self.action("item_status", table_id="1", item_id=item_id, status="ready")
+        self.action("table_paid", table_id="1")
+        self.action("item_add", table_id="2", menu_id="menu-te", quantity=1)
+        self.action("item_status", table_id="2", item_id=self.client.get("/api/state").json["tables"][1]["items"][0]["id"], status="canceled")
+
+        closed = self.action("shift_close")
+        self.assertEqual(closed.status_code, 200)
+        state = closed.json
+        self.assertIsNone(state["shift"])
+        self.assertEqual({table["status"] for table in state["tables"]}, {"free"})
+        self.assertEqual((state["pending_sales"], state["pending_tickets"]), ([], []))
+        closure = state["sales_closures"][-1]
+        self.assertEqual((closure["shift"], closure["total_amount"], closure["total_units"], closure["tickets"]), ("morning", 2000, 1, 1))
+        self.assertIn("started_at", closure)
+
+        again = self.action("shift_close")
+        self.assertEqual(again.status_code, 400)
+        self.assertEqual(self.action("shift_start", shift="afternoon").status_code, 200)
 
 class SiteMenuTests(unittest.TestCase):
     def setUp(self):

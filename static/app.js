@@ -202,10 +202,62 @@ function renderReadyNotice() {
   readyNoticeElement.innerHTML = `<span class="ready-notice-icon" aria-hidden="true">!</span><span class="ready-notice-copy"><strong>¡Hay pedidos listos para retirar!</strong><span>${summary}</span><span class="ready-notice-items">${preview}${remaining ? ` &nbsp; | &nbsp; y ${remaining} más` : ""}</span></span><span class="ready-notice-action">Ir a buscar →</span>`;
 }
 
+const SHIFT_LABELS = { morning: "mañana", afternoon: "tarde" };
+
+function formatTimeOfDay(timestamp) {
+  return new Intl.DateTimeFormat("es-AR", { hour: "2-digit", minute: "2-digit" }).format(new Date(timestamp));
+}
+
+function closureMessage(closure) {
+  const label = SHIFT_LABELS[closure.shift] || closure.shift;
+  const when = (timestamp) => new Date(timestamp).toLocaleString("es-AR", { dateStyle: "short", timeStyle: "short" });
+  const lines = closure.items.map((item) => `• ${item.name}: ${item.quantity}`);
+  return [
+    `CIERRE TURNO ${label.toUpperCase()}`,
+    closure.started_at ? `Inicio: ${when(closure.started_at)}` : "",
+    `Cierre: ${when(closure.closed_at)}`,
+    "",
+    `Ventas cobradas: ${money(closure.total_amount || 0)} (${closure.tickets || 0} ${closure.tickets === 1 ? "cobro" : "cobros"})`,
+    "",
+    "Productos vendidos:",
+    ...(lines.length ? lines : ["(sin ventas)"]),
+    "",
+    `Total de unidades: ${closure.total_units}`,
+  ].filter((line, index, all) => line !== "" || all[index - 1] !== "").join("\n");
+}
+
+function whatsappUrl(closure) {
+  return `https://wa.me/?text=${encodeURIComponent(closureMessage(closure))}`;
+}
+
+function showShiftClosedDialog(closure) {
+  const label = SHIFT_LABELS[closure.shift] || closure.shift;
+  const body = `<div class="shift-summary"><div><span>Ventas cobradas</span><strong>${money(closure.total_amount || 0)}</strong></div><div><span>Cobros</span><strong>${closure.tickets || 0}</strong></div><div><span>Unidades</span><strong>${closure.total_units}</strong></div></div><p class="dialog-hint">Mandá las estadísticas del turno por WhatsApp. También podés enviarlas más tarde desde Estadística.</p>`;
+  showDialog({ eyebrow: "Turno cerrado", title: `Turno ${label}`, body, submitLabel: "Enviar estadísticas por WhatsApp", cancelLabel: "Ahora no", onSubmit: () => {
+    window.open(whatsappUrl(closure), "_blank");
+    return true;
+  } });
+}
+
+function renderShiftStart() {
+  readyNoticeElement.hidden = true;
+  readyNoticeElement.innerHTML = "";
+  const closures = Array.isArray(state.sales_closures) ? state.sales_closures : [];
+  const last = closures[closures.length - 1];
+  const lastText = last ? `Último cierre: turno ${SHIFT_LABELS[last.shift] || last.shift} · ${new Date(last.closed_at).toLocaleString("es-AR", { dateStyle: "short", timeStyle: "short" })}` : "Todavía no hay turnos cerrados.";
+  const suggested = new Date().getHours() < 15 ? "morning" : "afternoon";
+  const card = (shift, icon, title, hours) => `<button class="role-card ${shift === suggested ? "suggested" : ""}" type="button" data-action="shift-start" data-shift="${shift}"><span class="role-icon" aria-hidden="true">${icon}</span><strong>${title}</strong><span>${hours}</span></button>`;
+  appRoot.innerHTML = `<section class="role-screen"><div class="role-brand"><span class="brand-mark" aria-hidden="true">C</span><p class="eyebrow">Comanda del bar</p><h1>Iniciar turno</h1><p>Elegí el turno para abrir el negocio. Los datos se mantienen hasta que cierres el turno.</p></div><div class="role-grid">${card("morning", "☀", "Turno mañana", "Desayunos y meriendas")}${card("afternoon", "🌙", "Turno tarde", "Tarde y noche")}</div><p class="order-meta shift-last">${escapeHtml(lastText)}</p></section>`;
+}
+
 function applyRoleUi() {
   const picking = !currentRole;
   const kitchenOnly = currentRole === "cocina";
-  document.querySelector(".main-nav").hidden = picking || kitchenOnly;
+  const shift = state?.shift;
+  const shiftBadge = document.querySelector("#shiftBadge");
+  shiftBadge.hidden = picking || !shift;
+  if (shift) shiftBadge.textContent = `Turno ${SHIFT_LABELS[shift.type] || shift.type}`;
+  document.querySelector(".main-nav").hidden = picking || kitchenOnly || (Boolean(state) && !shift);
   document.querySelector(".waiter-field").hidden = picking || kitchenOnly;
   document.querySelector("#roleButton").hidden = picking;
   document.querySelectorAll(".nav-button").forEach((button) => {
@@ -230,6 +282,7 @@ function render() {
   if (!state) return;
   if (currentRole === "cocina") activeView = "kitchen";
   applyRoleUi();
+  if (!state.shift) { renderShiftStart(); return; }
   renderReadyNotice();
   if (activeView === "home") renderHome();
   if (activeView === "tables") renderTables();
@@ -255,7 +308,7 @@ function renderHome() {
   const formatTime = (timestamp) => new Intl.DateTimeFormat("es-AR", { hour: "2-digit", minute: "2-digit" }).format(new Date(timestamp));
   const closedRows = tickets.length ? tickets.slice().reverse().map((ticket) => `<div class="order-row"><span><span class="order-name">${escapeHtml(ticket.table_name)}</span><br><span class="order-meta">${plural(Number(ticket.units) || 0, "unidad", "unidades")} · ${formatTime(ticket.paid_at)}</span></span><span class="status ready">Cobrada</span><span class="order-price">${money(ticket.total)}</span></div>`).join("") : `<div class="activity-empty"><div class="empty-mark">$</div>Los cobros del turno van a aparecer acá.</div>`;
 
-  appRoot.innerHTML = `${pageHeading("Resumen del turno", "Ventas del turno", `Total ${money(openTotal + closedTotal)} · cobrado y por cobrar, actualizado en todos los dispositivos.`, `<button class="button button-secondary" data-go="statistics">Estadística</button>`)}
+  appRoot.innerHTML = `${pageHeading(`Turno ${SHIFT_LABELS[state.shift.type] || state.shift.type} · desde ${formatTimeOfDay(state.shift.started_at)}`, "Ventas del turno", `Total ${money(openTotal + closedTotal)} · cobrado y por cobrar, actualizado en todos los dispositivos.`, `<div class="page-heading-buttons"><button class="button button-secondary" data-go="statistics">Estadística</button><button class="button button-primary" data-action="shift-close">Cerrar turno</button></div>`)}
     <section class="stats" aria-label="Resumen de ventas y cocina">
       <div class="stat"><div class="stat-label">Ventas abiertas</div><div class="stat-value">${money(openTotal)}</div><div class="stat-sub">${plural(openTables.length, "mesa", "mesas")} · ${plural(openUnits, "unidad", "unidades")}</div></div>
       <div class="stat"><div class="stat-label">Ventas cerradas</div><div class="stat-value">${money(closedTotal)}</div><div class="stat-sub">${plural(tickets.length, "cobro", "cobros")} · ${plural(closedUnits, "unidad", "unidades")}</div></div>
@@ -278,11 +331,10 @@ function renderStatistics() {
     const shiftLabel = closure.shift === "morning" ? "Mañana" : "Tarde";
     const closedDate = new Date(closure.closed_at).toLocaleString("es-AR", { dateStyle: "short", timeStyle: "short" });
     const items = closure.items.map((item) => `<span>${escapeHtml(item.name)} × ${Number(item.quantity) || 0}</span>`).join("");
-    return `<article class="sales-closure"><div class="sales-closure-head"><strong>Turno ${shiftLabel}</strong><span>${closedDate}</span></div><div class="sales-closure-items">${items}</div><strong class="sales-closure-total">${Number(closure.total_units) || 0} unidades</strong></article>`;
+    return `<article class="sales-closure"><div class="sales-closure-head"><strong>Turno ${shiftLabel}</strong><span>${closedDate}</span></div><div class="sales-closure-items">${items}</div><strong class="sales-closure-total">${money(closure.total_amount || 0)} · ${Number(closure.total_units) || 0} unidades</strong><button class="button button-secondary button-small" type="button" data-action="closure-whatsapp" data-closure-id="${escapeHtml(closure.id)}">Enviar por WhatsApp</button></article>`;
   }).join("");
-  const closeDisabled = pendingSales.length ? "" : "disabled";
-  appRoot.innerHTML = `${pageHeading("Ventas", "Estadística", "Unidades de productos cobrados desde el último cierre de turno.", `<button class="button button-secondary" data-go="home">← Inicio</button>`)}
-    <section class="section-panel sales-summary"><div class="section-title"><div><h2>Pendiente de cierre</h2><p class="order-meta">${pendingSales.length} productos · ${totalUnits} unidades</p></div></div><div class="sales-list">${saleRows}</div><div class="sales-close-actions"><button class="button button-primary" data-action="sales-close" data-shift="morning" ${closeDisabled}>Cerrar turno mañana y enviar por WhatsApp</button><button class="button button-primary" data-action="sales-close" data-shift="afternoon" ${closeDisabled}>Cerrar turno tarde y enviar por WhatsApp</button></div></section>
+  appRoot.innerHTML = `${pageHeading("Ventas", "Estadística", "Unidades de productos cobrados desde el inicio del turno.", `<button class="button button-secondary" data-go="home">← Inicio</button>`)}
+    <section class="section-panel sales-summary"><div class="section-title"><div><h2>Turno en curso</h2><p class="order-meta">${pendingSales.length} productos · ${totalUnits} unidades</p></div></div><div class="sales-list">${saleRows}</div><div class="sales-close-actions"><button class="button button-primary" data-action="shift-close">Cerrar turno ${SHIFT_LABELS[state.shift.type] || ""} y enviar estadísticas</button></div></section>
     <section class="section-panel sales-history"><div class="section-title"><h2>Últimos cierres</h2></div>${history || `<p class="order-meta">Todavía no hay cierres guardados.</p>`}</section>`;
 }
 
@@ -410,11 +462,11 @@ function renderMenu() {
   appRoot.innerHTML = `${pageHeading("Productos y precios", "Carta del bar", `${state.menu.length} productos · los cambios se ven en todos los teléfonos.`, addButton)}${rows || `<section class="section-panel"><div class="empty-state"><h2>La carta está vacía</h2><p>Agregá el primer producto para empezar.</p></div></section>`}`;
 }
 
-function showDialog({ eyebrow = "", title, body, submitLabel = "Guardar", onSubmit }) {
+function showDialog({ eyebrow = "", title, body, submitLabel = "Guardar", cancelLabel = "Cancelar", onSubmit }) {
   document.querySelector("#dialogEyebrow").textContent = eyebrow;
   document.querySelector("#dialogTitle").textContent = title;
   dialogBody.innerHTML = body;
-  dialogActions.innerHTML = `<button class="button button-secondary" type="button" data-close-dialog>Cancelar</button><button class="button button-primary" type="submit">${escapeHtml(submitLabel)}</button>`;
+  dialogActions.innerHTML = `<button class="button button-secondary" type="button" data-close-dialog>${escapeHtml(cancelLabel)}</button><button class="button button-primary" type="submit">${escapeHtml(submitLabel)}</button>`;
   dialogForm.onsubmit = async (event) => {
     event.preventDefault();
     const data = Object.fromEntries(new FormData(dialogForm).entries());
@@ -805,19 +857,28 @@ appRoot.addEventListener("click", async (event) => {
   }  if (actionButton.dataset.action === "item-status") {
     await sendAction({ type: "item_status", table_id: tableId, item_id: actionButton.dataset.itemId, status: actionButton.dataset.status });
   }
-  if (actionButton.dataset.action === "sales-close") {
+  if (actionButton.dataset.action === "shift-start") {
     const shift = actionButton.dataset.shift;
-    const shiftLabel = shift === "morning" ? "mañana" : "tarde";
-    if (!window.confirm(`¿Cerrar el turno ${shiftLabel}? Las ventas actuales quedarán separadas para el siguiente turno.`)) return;
-    const whatsappWindow = window.open("about:blank", "_blank");
-    const closed = await sendAction({ type: "sales_close", shift }, `Cierre del turno ${shiftLabel} guardado.`);
-    if (!closed) { whatsappWindow?.close(); return; }
-    const closure = state.sales_closures[state.sales_closures.length - 1];
-    const lines = closure.items.map((item) => `• ${item.name}: ${item.quantity}`);
-    const message = [`CIERRE TURNO ${shiftLabel.toUpperCase()}`, `Fecha: ${new Date(closure.closed_at).toLocaleString("es-AR")}`, "", "Productos vendidos:", ...lines, "", `Total de unidades: ${closure.total_units}`].join("\n");
-    const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(message)}`;
-    if (whatsappWindow) whatsappWindow.location.href = whatsappUrl;
-    else showToast("El cierre quedó guardado, pero el navegador bloqueó la ventana de WhatsApp.", true);
+    const started = await sendAction({ type: "shift_start", shift, waiter: waiterInput.value.trim() }, `Turno ${SHIFT_LABELS[shift]} iniciado.`);
+    if (started) {
+      activeView = currentRole === "cocina" ? "kitchen" : "home";
+      activeTableId = null;
+      render();
+    }
+  }
+  if (actionButton.dataset.action === "shift-close") {
+    const label = SHIFT_LABELS[state.shift?.type] || "";
+    if (!window.confirm(`¿Cerrar el turno ${label}? Se guardan las estadísticas y las ventas arrancan de cero en el próximo turno.`)) return;
+    const closed = await sendAction({ type: "shift_close" });
+    if (closed) {
+      activeView = "home";
+      render();
+      showShiftClosedDialog(state.sales_closures[state.sales_closures.length - 1]);
+    }
+  }
+  if (actionButton.dataset.action === "closure-whatsapp") {
+    const closure = state.sales_closures.find((entry) => entry.id === actionButton.dataset.closureId);
+    if (closure) window.open(whatsappUrl(closure), "_blank");
   }
   if (actionButton.dataset.action === "finish-ticket") {
     const table = state.tables.find((entry) => entry.id === tableId);

@@ -445,3 +445,13 @@ h1, h2, h3 { font-family: 'Manrope', 'Avenir Next', sans-serif; }
 .home-grid button.order-row { cursor: pointer; }
 .home-grid button.order-row:hover { border-color: #6fd0a0; }
 @media (max-width: 760px) { .home-grid { grid-template-columns: 1fr; } }
+.shift-badge { padding: 5px 10px; border: 1px solid var(--green); border-radius: 20px; color: var(--green); background: var(--green-soft); font-size: 12px; font-weight: 800; white-space: nowrap; }
+.shift-badge[hidden] { display: none; }
+.role-card.suggested { border-color: var(--green); }
+.shift-last { margin-top: 18px; text-align: center; }
+.shift-summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-bottom: 12px; }
+.shift-summary div { display: grid; gap: 4px; padding: 12px; border: 1px solid var(--line); border-radius: 7px; background: #0e1112; text-align: center; }
+.shift-summary span { color: var(--muted); font-size: 11px; font-weight: 700; }
+.shift-summary strong { font: 800 18px 'Manrope', sans-serif; }
+.sales-closure .button-small { margin-top: 8px; }
+@media (max-width: 760px) { .shift-badge { padding: 4px 8px; font-size: 11px; } }
