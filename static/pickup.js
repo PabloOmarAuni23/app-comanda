@@ -26,6 +26,33 @@ function formatElapsed(minutes) {
   return remainder ? `${hours} h ${remainder} min` : `${hours} h`;
 }
 
+function formatClock(startTimestamp, endTimestamp) {
+  const start = Date.parse(startTimestamp || "");
+  if (!Number.isFinite(start)) return "--:--";
+  const end = endTimestamp ? Date.parse(endTimestamp) : Date.now();
+  const totalSeconds = Math.max(0, Math.floor(((Number.isFinite(end) ? end : Date.now()) - start) / 1000));
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = String(Math.floor((totalSeconds % 3600) / 60)).padStart(2, "0");
+  const seconds = String(totalSeconds % 60).padStart(2, "0");
+  return hours ? `${hours}:${minutes}:${seconds}` : `${minutes}:${seconds}`;
+}
+
+function createClock(startTimestamp, endTimestamp) {
+  const clock = document.createElement("span");
+  clock.className = "order-clock";
+  clock.dataset.start = startTimestamp || "";
+  clock.dataset.end = endTimestamp || "";
+  clock.textContent = formatClock(startTimestamp, endTimestamp);
+  clock.setAttribute("role", "timer");
+  return clock;
+}
+
+function tickOrderClocks() {
+  appRoot.querySelectorAll(".order-clock").forEach((clock) => {
+    if (!clock.dataset.end) clock.textContent = formatClock(clock.dataset.start, null);
+  });
+}
+
 function readyPickupTables() {
   return state.tables
     .filter((table) => table.status === "open")
@@ -132,17 +159,18 @@ function renderTableOrderStatus(table) {
     row.querySelector(".order-elapsed")?.remove();
     if (!["sent", "preparing", "suspended", "ready"].includes(item.status) || item.status === "ready" && item.retrieved_at) return;
 
-    const sentMinutes = elapsedMinutes(item.sent_at);
     const elapsed = document.createElement("div");
     elapsed.className = "order-elapsed";
-    elapsed.dataset.sentAt = item.sent_at || "";
-    elapsed.dataset.readyAt = item.ready_at || "";
     if (item.status === "ready") {
-      const readyMinutes = elapsedMinutes(item.ready_at || item.sent_at);
-      elapsed.textContent = `Tiempo total: ${formatElapsed(sentMinutes)} · esperando retiro: ${formatElapsed(readyMinutes)}`;
+      elapsed.append(
+        "Tiempo total ",
+        createClock(item.sent_at, item.ready_at || null),
+        " · esperando retiro ",
+        createClock(item.ready_at || item.sent_at, null),
+      );
     } else {
       const labels = { sent: "En cocina", preparing: "En preparación", suspended: "Demorado" };
-      elapsed.textContent = `${labels[item.status]} · enviado hace ${formatElapsed(sentMinutes)}`;
+      elapsed.append(`${labels[item.status]} · `, createClock(item.sent_at, null));
     }
     row.querySelector(".order-meta")?.after(elapsed);
   });
@@ -185,3 +213,5 @@ appRoot.addEventListener("click", async (event) => {
 setInterval(() => {
   if (state && currentRole) renderPickupState();
 }, 15000);
+
+setInterval(tickOrderClocks, 1000);
