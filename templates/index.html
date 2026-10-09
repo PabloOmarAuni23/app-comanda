@@ -11,7 +11,7 @@
   <link rel="manifest" href="/manifest.json">
   <link rel="apple-touch-icon" sizes="180x180" href="/static/apple-touch-icon.png">
   <link rel="icon" href="/static/icon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="/static/style.css?v=26">
+  <link rel="stylesheet" href="/static/style.css?v=27">
   <style>
     .ready-notice { position: sticky; top: 0; z-index: 2; width: min(1120px, calc(100% - 40px)); margin: 14px auto 0; }
     .ready-notice[hidden] { display: none; }
@@ -41,7 +41,8 @@
 
   <nav class="main-nav" aria-label="Secciones">
     <button class="nav-button active" type="button" data-view="home"><span aria-hidden="true">⌂</span>Inicio</button>
-    <button class="nav-button" type="button" data-view="tables"><span aria-hidden="true">▦</span>Mesas</button>
+    <button class="nav-button" type="button" data-view="tables" data-zone="Salón adentro"><span aria-hidden="true">▦</span><b class="nav-full">Salón adentro</b><b class="nav-short">Adentro</b></button>
+    <button class="nav-button" type="button" data-view="tables" data-zone="Salón afuera"><span aria-hidden="true">☀</span><b class="nav-full">Salón afuera</b><b class="nav-short">Afuera</b></button>
     <button class="nav-button" type="button" data-view="kitchen"><span aria-hidden="true">♨</span>Cocina</button>
     <button class="nav-button" type="button" data-view="menu"><span aria-hidden="true">≡</span>Carta</button>
   </nav>
@@ -60,8 +61,8 @@
     </form>
   </dialog>
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
-  <script src="/static/app.js?v=26" defer></script>
-  <script src="/static/pickup.js?v=26" defer></script>
-  <script src="/static/alerts.js?v=26" defer></script>
+  <script src="/static/app.js?v=27" defer></script>
+  <script src="/static/pickup.js?v=27" defer></script>
+  <script src="/static/alerts.js?v=27" defer></script>
 </body>
 </html>

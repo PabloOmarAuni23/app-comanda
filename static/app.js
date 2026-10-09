@@ -209,7 +209,11 @@ function applyRoleUi() {
   document.querySelector("#roleButton").hidden = picking;
   document.querySelectorAll(".nav-button").forEach((button) => {
     if (picking) button.classList.remove("active");
-    else button.classList.toggle("active", kitchenOnly ? button.dataset.view === "kitchen" : button.dataset.view === activeView);
+    else if (kitchenOnly) button.classList.toggle("active", button.dataset.view === "kitchen");
+    else {
+      const currentView = activeView === "table-detail" ? "tables" : activeView;
+      button.classList.toggle("active", button.dataset.view === currentView && (!button.dataset.zone || button.dataset.zone === activeZone));
+    }
   });
 }
 
@@ -283,21 +287,15 @@ function tableZone(table) {
 }
 
 function renderTables() {
-  const openCount = state.tables.filter((table) => table.status === "open").length;
   const createButton = `<button class="button button-primary" data-action="add-table">＋ <span>Mesa</span></button>`;
   const renderTile = (table) => {
     const description = table.status === "open" ? `${table.items.length} productos · ${money(tableTotal(table))}` : table.status === "cleaning" ? "Cobro registrado" : "Tocá para abrir";
     const caption = table.status === "open" ? `Atiende ${table.opened_by}${guestsSuffix(table)}` : statusLabel(table.status);
     return `<button class="table-tile ${table.status}" data-table="${escapeHtml(table.id)}"><span class="status ${table.status}">${statusLabel(table.status)}</span><strong>${escapeHtml(table.name)}</strong><span class="table-detail">${escapeHtml(description)}</span><span class="table-detail">${escapeHtml(caption)}</span>${table.status === "open" ? orderFlow(table) : ""}</button>`;
   };
-  const zoneTabs = TABLE_ZONES.map((zone) => {
-    const zoneTables = state.tables.filter((table) => tableZone(table) === zone);
-    const zoneOpen = zoneTables.filter((table) => table.status === "open").length;
-    const selected = zone === activeZone;
-    return `<button class="zone-tab ${selected ? "active" : ""}" type="button" role="tab" aria-selected="${selected}" data-zone-tab="${escapeHtml(zone)}"><strong>${escapeHtml(zone)}</strong><span>${zoneOpen} de ${zoneTables.length} ocupadas</span></button>`;
-  }).join("");
-  const zoneTiles = state.tables.filter((table) => tableZone(table) === activeZone).map(renderTile).join("");
-  appRoot.innerHTML = `${pageHeading("Servicio", "Mesas", `${openCount} abiertas · tocá una mesa para abrirla o ver el pedido.`, createButton)}<div class="zone-layout"><div class="zone-tabs" role="tablist" aria-label="Salones">${zoneTabs}</div><div class="table-grid">${zoneTiles}</div></div>`;
+  const zoneTables = state.tables.filter((table) => tableZone(table) === activeZone);
+  const zoneOpen = zoneTables.filter((table) => table.status === "open").length;
+  appRoot.innerHTML = `${pageHeading("Servicio", activeZone, `${zoneOpen} de ${zoneTables.length} ocupadas · tocá una mesa para abrirla o ver el pedido.`, createButton)}<div class="table-grid">${zoneTables.map(renderTile).join("")}</div>`;
 }
 
 function renderTableDetail() {
@@ -421,7 +419,7 @@ function showDialog({ eyebrow = "", title, body, submitLabel = "Guardar", onSubm
 }
 
 function showAddTableDialog() {
-  showDialog({ eyebrow: "Salón", title: "Agregar mesa", body: `<label class="dialog-field">Sector<select name="zone">${TABLE_ZONES.map((zone) => `<option value="${escapeHtml(zone)}">${escapeHtml(zone)}</option>`).join("")}</select></label><label class="dialog-field">Nombre o número<input name="name" maxlength="40" placeholder="Por ejemplo: Mesa 17" required></label>`, submitLabel: "Agregar mesa", onSubmit: (data) => sendAction({ type: "table_create", name: data.name, zone: data.zone }, "Mesa agregada.") });
+  showDialog({ eyebrow: "Salón", title: "Agregar mesa", body: `<label class="dialog-field">Sector<select name="zone">${TABLE_ZONES.map((zone) => `<option value="${escapeHtml(zone)}" ${zone === activeZone ? "selected" : ""}>${escapeHtml(zone)}</option>`).join("")}</select></label><label class="dialog-field">Nombre o número<input name="name" maxlength="40" placeholder="Por ejemplo: Mesa 17" required></label>`, submitLabel: "Agregar mesa", onSubmit: (data) => sendAction({ type: "table_create", name: data.name, zone: data.zone }, "Mesa agregada.") });
 }
 
 function showOpenTableDialog(table) {
@@ -691,7 +689,9 @@ function setView(view) {
 
 document.querySelector(".main-nav").addEventListener("click", (event) => {
   const button = event.target.closest("[data-view]");
-  if (button) setView(button.dataset.view);
+  if (!button) return;
+  if (button.dataset.zone) activeZone = button.dataset.zone;
+  setView(button.dataset.view);
 });
 
 appRoot.addEventListener("change", async (event) => {
@@ -728,12 +728,6 @@ appRoot.addEventListener("click", async (event) => {
       activeView = "table-detail";
       render();
     }
-    return;
-  }
-  const zoneTab = event.target.closest("[data-zone-tab]");
-  if (zoneTab) {
-    activeZone = zoneTab.dataset.zoneTab;
-    renderTables();
     return;
   }
   const productButton = event.target.closest("[data-add-product]");
