@@ -13,9 +13,36 @@ from flask import Flask, jsonify, render_template, request
 from carta import CARTA_SECTIONS, INFUSION_EXTRA_PRODUCTS, INFUSION_OPTIONS
 from storage import PostgresConnection
 
+# Configuración central (sobrescribe DATABASE_PATH y añade variables de entorno)
+from config import (
+    DATABASE_URL,
+    DATABASE_PATH,
+    ENV,
+    PORT,
+    SQLALCHEMY_DATABASE_URI,
+)
+
+
+# Iguala DATABASE_PATH si está configurado o usa la configuración por defecto
+DATABASE_PATH = Path(os.environ.get("DATABASE_PATH", "instance/comanda.sqlite3"))
+
+# Nombre de la base de datos (usado para SQLite)
+if DATABASE_URL:
+    DB_NAME = "postgres"
+else:
+    DB_NAME = DATABASE_PATH.stem
+
+# Ruta de la base de datos
+if DATABASE_URL:
+    DB_PATH = None
+else:
+    DB_PATH = DATABASE_PATH
 
 app = Flask(__name__)
-DATABASE_PATH = Path(os.environ.get("DATABASE_PATH", "instance/comanda.sqlite3"))
+app.config["SQLALCHEMY_DATABASE_URI"] = SQLALCHEMY_DATABASE_URI
+app.config["DATABASE_URL"] = DATABASE_URL
+app.config["DB_NAME"] = DB_NAME
+app.config["DB_PATH"] = DB_PATH
 
 
 def now_iso():

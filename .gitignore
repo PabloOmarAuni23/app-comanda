@@ -1,8 +1,24 @@
+# Python
 __pycache__/
 *.py[cod]
-instance/
+*.pyo
+*.egg-info/
 .venv/
 venv/
+env/
+ENV/
+
+# Datos de la aplicación (no versionar)
+instance/
+*.sqlite3
+*.sqlite3-journal
+respaldos/
+
+# Entorno
 .env
 .deps-instaladas
-respaldos/
+
+# VS Code
+.vscode/launch.json
+.vscode/settings.json
+.vscode/tasks.json
