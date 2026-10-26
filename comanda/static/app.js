@@ -1191,7 +1191,14 @@ document.querySelector("#roleButton").addEventListener("click", () => {
   render();
 });
 
-if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js?v=45").catch(() => {});
+if ("serviceWorker" in navigator) {
+  let hadController = Boolean(navigator.serviceWorker.controller);
+  navigator.serviceWorker.addEventListener("controllerchange", () => {
+    if (hadController) window.location.reload();
+    hadController = true;
+  });
+  navigator.serviceWorker.register("/sw.js?v=49", { updateViaCache: "none" }).catch(() => {});
+}
 loadState(true);
 setInterval(() => loadState(), 2200);
 setInterval(() => {
