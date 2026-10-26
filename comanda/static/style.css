@@ -1,20 +1,20 @@
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap');
 
 :root {
-  color-scheme: dark;
-  --paper: #000000;
-  --surface: #15181a;
-  --ink: #f4f6f5;
-  --muted: #aeb6b1;
-  --line: #343b3d;
-  --green: #37d393;
-  --green-soft: #10261d;
+  color-scheme: light;
+  --paper: #f4f6f3;
+  --surface: #ffffff;
+  --ink: #202a25;
+  --muted: #68736d;
+  --line: #d9e0db;
+  --green: #16845a;
+  --green-soft: #e1f3e9;
   --orange: #ff9a55;
-  --orange-soft: #2c1a0d;
-  --red: #ff6b5e;
-  --red-soft: #2e1310;
-  --yellow: #f5c34f;
-  --shadow: 0 10px 28px rgba(0, 0, 0, .55);
+  --orange-soft: #fff0df;
+  --red: #bd3e34;
+  --red-soft: #fbe9e7;
+  --yellow: #a87508;
+  --shadow: 0 10px 28px rgba(33, 53, 41, .10);
   font-family: 'DM Sans', 'Avenir Next', sans-serif;
   color: var(--ink);
   background: var(--paper);
@@ -24,7 +24,7 @@
 
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
-body { margin: 0; min-width: 320px; min-height: 100vh; background: radial-gradient(ellipse at 9% 8%, rgba(255,255,255,.05), transparent 36%), var(--paper); }
+body { margin: 0; min-width: 320px; min-height: 100vh; background: var(--paper); }
 button, input, textarea, select { font: inherit; }
 button { color: inherit; }
 .topbar { min-height: 76px; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 12px max(24px, calc((100vw - 1180px)/2)); border-bottom: 1px solid var(--line); background: rgba(6,8,7,.88); }
@@ -451,6 +451,40 @@ h1, h2, h3 { font-family: 'Manrope', 'Avenir Next', sans-serif; }
 .shift-last { margin-top: 18px; text-align: center; }
 .shift-summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-bottom: 12px; }
 .shift-summary div { display: grid; gap: 4px; padding: 12px; border: 1px solid var(--line); border-radius: 7px; background: #0e1112; text-align: center; }
+
+/* Superficies claras para los perfiles de atención, mostrador y cocina. */
+.topbar { background: #fff; }
+.main-nav { background: #f4f6f3; }
+.nav-button:hover { background: #e7eee9; color: var(--ink); }
+.button-secondary, .icon-button, .section-panel, .table-tile, .mini-table,
+.product-button, .kitchen-ticket, .modifier-group-editor, .modifier-selection,
+.menu-row, .role-card { color: var(--ink); background-color: #fff; }
+.button-secondary:hover, .product-button:hover { background: #f0f5f1; }
+.table-tile:hover, .mini-table:hover, .role-card:hover { background: #f5f8f5; }
+.waiter-field input, .dialog-field input, .dialog-field textarea, .dialog-field select,
+.kitchen-state-select, .kitchen-advance, .modifier-condition-options { color: var(--ink); background: #fff; }
+.ticket-items, .ticket-footer, .modifier-group-editor { border-color: var(--line); }
+.ticket-item, .sales-summary, .shift-summary div { color: var(--ink); background: #f7f9f7; }
+.ready-notice-table { color: #fff; }
+.ticket-head.ticket-on-time { background: #dff4e8; color: #174c31; }
+.ticket-head.ticket-delayed { background: #fff2c7; color: #594500; }
+.ticket-head.ticket-very-late { background: #ffe6d3; color: #693510; }
+.ticket-head.ticket-cancel-risk { background: #fbe1df; color: #70241e; }
+.ticket-on-time { color: #17603a; background: #e1f3e9; }
+.ticket-delayed { color: #725900; background: #fff4cd; }
+.ticket-very-late { color: #7a3c12; background: #ffeadb; }
+.ticket-cancel-risk { color: #812b24; background: #fbe5e2; }
+.ticket-modifiers { color: #17603a; background: #e6f5eb; }
+.ticket-note { color: #765600; background: #fff5d8; }
+.storage-warning { color: #812b24; background: #fbe5e2; }
+.toast { color: #fff; }
+.modifier-option input, .modifier-selection input { accent-color: var(--green); }
+.modifier-dropdown-label { margin: 12px 0 2px; }
+.modifier-dropdown { min-height: 48px !important; font-weight: 700; }
+.page-heading-buttons { display: flex; flex-wrap: wrap; gap: 8px; }
+.shared-category-picker { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 10px; margin-top: 14px; }
+.shared-category-picker .dialog-field { margin: 0; }
+@media (max-width: 540px) { .shared-category-picker { grid-template-columns: 1fr; } .page-heading-buttons { justify-content: flex-end; } }
 .shift-summary span { color: var(--muted); font-size: 11px; font-weight: 700; }
 .shift-summary strong { font: 800 18px 'Manrope', sans-serif; }
 .sales-closure .button-small { margin-top: 8px; }

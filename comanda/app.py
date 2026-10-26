@@ -76,6 +76,16 @@ def default_classic_combo():
     }
 
 
+def default_modifier_catalog():
+    groups = default_classic_combo()["modifier_groups"]
+    groups[1].pop("show_when", None)
+    groups[1]["options"].append({"name": "Factura con crema", "price": 700})
+    groups.append({"name": "Incluido", "selection": "single", "required": False, "options": [
+        {"name": "Soda", "price": 0}, {"name": "Agua", "price": 0},
+    ]})
+    return groups
+
+
 def menu_slug(value):
     ascii_text = unicodedata.normalize("NFKD", str(value or "")).encode("ascii", "ignore").decode("ascii")
     return re.sub(r"[^a-z0-9]+", "-", ascii_text.lower()).strip("-")
@@ -493,6 +503,7 @@ def initial_state():
         "pending_sales": [],
         "sales_closures": [],
         "menu": build_site_menu(),
+        "modifier_catalog": default_modifier_catalog(),
     }
 
 
@@ -531,10 +542,23 @@ def ensure_existing_state(connection):
     row = connection.execute("SELECT document, updated_at FROM app_state WHERE id = 1").fetchone()
     if row is not None:
         state = json.loads(row["document"])
+        updated = False
+        if not isinstance(state.get("modifier_catalog"), list):
+            catalog = default_modifier_catalog()
+            state["modifier_catalog"] = catalog
+            catalog_by_name = {group["name"].casefold(): group for group in catalog}
+            for dish in state.get("menu", []):
+                for index, existing in enumerate(dish.get("modifier_groups", [])):
+                    replacement = catalog_by_name.get(existing.get("name", "").casefold())
+                    if replacement:
+                        updated_group = dict(replacement)
+                        if existing.get("show_when"):
+                            updated_group["show_when"] = existing["show_when"]
+                        dish["modifier_groups"][index] = updated_group
+            updated = True
         migrations = state.get("_migrations", [])
         if not isinstance(migrations, list):
             migrations = []
-        updated = False
         if "classic-combo-v1" not in migrations:
             if not any(str(dish.get("name", "")).strip().casefold() in {"clásico", "clasico"} for dish in state["menu"]):
                 state["menu"].append(default_classic_combo())
@@ -750,6 +774,7 @@ def mutate_state(action):
         state.setdefault("shift", None)
         tables = state["tables"]
         menu = state["menu"]
+        state.setdefault("modifier_catalog", default_modifier_catalog())
         action_type = action.get("type")
         stamp = now_iso()
 
@@ -1071,6 +1096,20 @@ def mutate_state(action):
             if not isinstance(incoming_menu, list):
                 raise ValueError("La importación de la carta debe venir como una lista de productos.")
             menu[:] = merge_menu_entries(menu, incoming_menu)
+        elif action_type == "modifier_catalog_update":
+            catalog = normalize_modifier_groups(action.get("modifier_catalog", []))
+            if not catalog:
+                raise ValueError("La carta común necesita al menos una categoría con opciones.")
+            state["modifier_catalog"] = catalog
+            catalog_by_name = {group["name"].casefold(): group for group in catalog}
+            for dish in menu:
+                for index, existing in enumerate(dish.get("modifier_groups", [])):
+                    replacement = catalog_by_name.get(existing.get("name", "").casefold())
+                    if replacement:
+                        updated_group = dict(replacement)
+                        if existing.get("show_when"):
+                            updated_group["show_when"] = existing["show_when"]
+                        dish["modifier_groups"][index] = updated_group
         else:
             raise ValueError("Acción no reconocida.")
 

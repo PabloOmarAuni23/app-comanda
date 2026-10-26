@@ -271,3 +271,18 @@
  body:has(.kitchen-grid) .shift-badge { display:none; }
 }
 
+/* Mantener clara la pantalla de atención junto con el resto de los perfiles. */
+.kiosk-screen { --kiosk-accent: #16845a; }
+.kiosk-heading .eyebrow, .catalog-heading .text-button { color: #16845a; }
+.kiosk-open, .catalog-search, .kiosk-category-card, .kiosk-product,
+.kiosk-cart, .kiosk-cart-item, .kiosk-empty, .kiosk-summary,
+.kiosk-checkout, .kiosk-category-button { color: var(--ink); background: #fff; border-color: var(--line); }
+.catalog-search input { color: var(--ink); }
+.kiosk-categories .category-button { color: var(--muted); }
+.kiosk-categories .category-button:hover { background: #edf4ef; color: var(--ink); }
+.kiosk-categories .category-button.active { border-color: #16845a; color: #fff; background: #16845a; }
+.kiosk-open { color: #17603a; background: #e1f3e9; border-color: #b9dfc7; }
+.kiosk-product { box-shadow: 0 4px 14px rgba(33,53,41,.08); }
+.kiosk-product:hover { border-color: #16845a; background: #f7faf8; }
+.kiosk-cart { box-shadow: 0 8px 28px rgba(33,53,41,.10); }
+

@@ -528,7 +528,7 @@ function renderKitchen() {
 }
 
 function renderMenu() {
-  const addButton = `<button class="button button-primary" data-action="add-product">＋ <span>Plato</span></button>`;
+  const addButton = `<div class="page-heading-buttons"><button class="button button-secondary" data-action="edit-catalog">Editar categorías</button><button class="button button-primary" data-action="add-product">＋ <span>Plato</span></button></div>`;
   const categories = [...new Set(state.menu.map((dish) => dish.category))];
   const rows = categories.map((category) => {
     const products = state.menu.filter((dish) => dish.category === category).map((dish) => `<article class="menu-row ${dish.available ? "" : "unavailable"}"><div><h3>${escapeHtml(dish.name)}</h3><p>${escapeHtml(dish.description || "Sin descripción")} · ${dish.available ? "Disponible" : "Pausado"}</p></div><strong>${money(dish.price)}</strong><div class="menu-actions"><button class="icon-button" data-action="edit-product" data-menu-id="${escapeHtml(dish.id)}" aria-label="Editar ${escapeHtml(dish.name)}" title="Editar">✎</button><button class="icon-button" data-action="delete-product" data-menu-id="${escapeHtml(dish.id)}" aria-label="Eliminar ${escapeHtml(dish.name)}" title="Eliminar">×</button></div></article>`).join("");
@@ -647,18 +647,48 @@ function modifierGroupEditor(groups) {
   return `<div class="modifier-editor"><h3>Opciones para el pedido</h3><p class="modifier-help">Se muestran al elegir este producto. Usá un adicional de $0 para opciones incluidas; solo los agregados con recargo aumentan el precio. Si todos los grupos son de cantidades y sus opciones cuestan $0 o lo mismo que el producto (por ejemplo, las variedades de una tortilla), no se pide la cantidad aparte: cada unidad que se elija se cobra al precio del producto. Con «Mostrar cuando» el grupo se abre recién al marcar la opción que lo activa, por ejemplo los acompañamientos al elegir la infusión.</p>${groupRows || `<p class="modifier-empty">Sin opciones configuradas.</p>`}<button class="button button-secondary" type="button" data-group-action="add-group">＋ Agregar grupo</button></div>`;
 }
 
+function showCatalogDialog() {
+  let groups = structuredClone(state.modifier_catalog || []);
+  const renderEditor = () => modifierGroupEditor(groups);
+  showDialog({ eyebrow: "Carta compartida", title: "Categorías y opciones", body: renderEditor(), submitLabel: "Guardar para todos", onSubmit: () => sendAction({ type: "modifier_catalog_update", modifier_catalog: readModifierGroups() }, "Categorías actualizadas en todos los productos.") });
+  dialogBody.onclick = (event) => {
+    const button = event.target.closest("[data-group-action]");
+    if (!button) return;
+    groups = readModifierGroups();
+    const section = button.closest("[data-modifier-group]");
+    const gi = [...dialogBody.querySelectorAll("[data-modifier-group]")].indexOf(section);
+    const oi = section ? [...section.querySelectorAll("[data-modifier-option]")].indexOf(button.closest("[data-modifier-option]")) : -1;
+    if (button.dataset.groupAction === "add-group") groups.push({ name: "", selection: "single", required: false, options: [{ name: "", price: 0 }] });
+    if (button.dataset.groupAction === "remove-group") groups.splice(gi, 1);
+    if (button.dataset.groupAction === "add-option") groups[gi].options.push({ name: "", price: 0 });
+    if (button.dataset.groupAction === "remove-option") groups[gi].options.splice(oi, 1);
+    dialogBody.querySelector(".modifier-editor").outerHTML = renderEditor();
+  };
+}
+
 function showProductDialog(dish = null) {
   const editing = Boolean(dish);
   const categories = [...new Set(state.menu.map((entry) => entry.category))];
   const categoryOptions = [...new Set([...categories, "Infusiones", "Para acompañar", "Bebidas"])].map((category) => `<option value="${escapeHtml(category)}" ${dish?.category === category ? "selected" : ""}>${escapeHtml(category)}</option>`).join("");
   const groups = dish?.modifier_groups || [];
-  const body = `<label class="dialog-field">Nombre del producto<input name="name" maxlength="80" value="${escapeHtml(dish?.name || "")}" required></label><label class="dialog-field">Categoría<select name="category" required>${categoryOptions}<option value="__custom">Otra categoría…</option></select></label><label class="dialog-field custom-category" hidden>Nueva categoría<input name="custom_category" maxlength="40"></label><label class="dialog-field">Descripción<textarea name="description" maxlength="120" placeholder="Detalle opcional">${escapeHtml(dish?.description || "")}</textarea></label><label class="dialog-field">Precio en pesos<input name="price" type="number" min="0" step="1" value="${escapeHtml(dish?.price ?? "")}" required></label>${editing ? `<label class="dialog-field">Disponibilidad<select name="available"><option value="true" ${dish.available ? "selected" : ""}>Disponible</option><option value="false" ${!dish.available ? "selected" : ""}>Pausado</option></select></label>` : ""}${modifierGroupEditor(groups)}`;
+  const sharedOptions = (state.modifier_catalog || []).map((group) => `<option value="${escapeHtml(group.name)}">${escapeHtml(group.name)}</option>`).join("");
+  const body = `<label class="dialog-field">Nombre del producto<input name="name" maxlength="80" value="${escapeHtml(dish?.name || "")}" required></label><label class="dialog-field">Categoría<select name="category" required>${categoryOptions}<option value="__custom">Otra categoría…</option></select></label><label class="dialog-field custom-category" hidden>Nueva categoría<input name="custom_category" maxlength="40"></label><label class="dialog-field">Descripción<textarea name="description" maxlength="120" placeholder="Detalle opcional">${escapeHtml(dish?.description || "")}</textarea></label><label class="dialog-field">Precio en pesos<input name="price" type="number" min="0" step="1" value="${escapeHtml(dish?.price ?? "")}" required></label>${editing ? `<label class="dialog-field">Disponibilidad<select name="available"><option value="true" ${dish.available ? "selected" : ""}>Disponible</option><option value="false" ${!dish.available ? "selected" : ""}>Pausado</option></select></label>` : ""}${modifierGroupEditor(groups)}<div class="shared-category-picker"><label class="dialog-field">Usar categoría de la carta común<select data-shared-category>${sharedOptions}</select></label><button class="button button-secondary" type="button" data-action="add-shared-category">Agregar al producto</button></div>`;
   showDialog({ eyebrow: editing ? "Editar carta" : "Carta del bar", title: editing ? "Editar producto" : "Nuevo producto", body, submitLabel: editing ? "Guardar cambios" : "Agregar producto", onSubmit: (data) => {
     const category = data.category === "__custom" ? data.custom_category : data.category;
     const action = { type: editing ? "menu_update" : "menu_add", menu_id: dish?.id, name: data.name, category, description: data.description, price: data.price, available: data.available !== "false", modifier_groups: readModifierGroups() };
     return sendAction(action, editing ? "Producto actualizado." : "Producto agregado.");
   } });
   dialogBody.onclick = (event) => {
+    if (event.target.closest('[data-action="add-shared-category"]')) {
+      const selectedName = dialogBody.querySelector("[data-shared-category]").value;
+      const shared = (state.modifier_catalog || []).find((entry) => entry.name === selectedName);
+      const current = readModifierGroups();
+      if (shared && !current.some((entry) => entry.name.toLowerCase() === shared.name.toLowerCase())) {
+        current.push(structuredClone(shared));
+        dialogBody.querySelector(".modifier-editor").outerHTML = modifierGroupEditor(current);
+      }
+      return;
+    }
     const button = event.target.closest("[data-group-action]");
     if (!button) return;
     const updatedGroups = readModifierGroups();
@@ -752,11 +782,11 @@ function showAddItemDialog(table, dish, item = null) {
     const options = group.options.map((option, optionIndex) => {
       const surcharge = group.name === "Tamaño" && group.selection === "single" ? money(Number(dish.price) + Number(option.price)) : group.name === "Acompañamientos" && !group.included_quantity ? `${money(option.price)} c/u` : unitProduct ? `${money(dish.price)} c/u` : option.price ? `${group.included_quantity ? "Extra " : ""}+${money(option.price)}` : "Incluido";
       return group.selection === "single"
-        ? `<label class="choice-tile"><input type="radio" name="modifier-group-${groupIndex}" data-single-choice value="${escapeHtml(option.name)}" ${selectedModifiers.some((modifier) => modifier.group === group.name && modifier.name === option.name) ? "checked" : ""} ${group.required ? 'data-required="true" required' : ""}><span><strong>${escapeHtml(option.name)}</strong><small>${surcharge}</small></span><b aria-hidden="true">✓</b></label>`
+        ? `<option value="${escapeHtml(option.name)}" ${selectedModifiers.some((modifier) => modifier.group === group.name && modifier.name === option.name) ? "selected" : ""}>${escapeHtml(option.name)} · ${escapeHtml(surcharge)}</option>`
         : `<div class="modifier-quantity-row modifier-card">${productArt({ name: option.name, category: group.name })}<div class="modifier-card-copy"><strong>${escapeHtml(option.name)}</strong><small>${surcharge}</small></div><div class="quantity-stepper modifier-stepper"><button class="quantity-step" type="button" data-quantity-step="-1" aria-label="Disminuir ${escapeHtml(option.name)}">−</button><input name="modifier-${groupIndex}-${optionIndex}" data-quantity-choice="${escapeHtml(option.name)}" type="number" min="0" max="99" value="${selectedModifiers.find((modifier) => modifier.group === group.name && modifier.name === option.name)?.quantity || 0}" inputmode="none" readonly aria-label="Cantidad de ${escapeHtml(option.name)}"><button class="quantity-step" type="button" data-quantity-step="1" aria-label="Aumentar ${escapeHtml(option.name)}">+</button></div></div>`;
     }).join("");
-    const noSelection = group.selection === "single" && !group.required ? `<label class="choice-tile"><input type="radio" name="modifier-group-${groupIndex}" data-single-choice value="" ${!selectedModifiers.some((modifier) => modifier.group === group.name) ? "checked" : ""}><span><strong>Sin selección</strong><small>Opcional</small></span><b aria-hidden="true">✓</b></label>` : "";
-    return `<fieldset class="modifier-selection" ${wrapperAttributes}><legend>${escapeHtml(group.name)}<small>${group.required ? "Obligatorio" : "Opcional"}</small></legend>${conditionHint}${group.name === "Acompañamientos" && !group.included_quantity ? `<p class="included-summary">Se cobra cada acompañamiento desde la primera unidad. Cantidades por café.</p>` : ""}${group.included_quantity ? `<p class="included-summary">${group.included_quantity} acompañamientos incluidos por combo. Los primeros dos que elegís están incluidos; los siguientes se cobran al precio de cada opción.<strong data-included-summary></strong></p>` : ""}<div class="${group.selection === "single" ? "choice-grid" : "quantity-options"}">${noSelection}${options}</div></fieldset>`;
+    const singleChoice = group.selection === "single" ? `<label class="dialog-field modifier-dropdown-label">Elegir ${escapeHtml(group.name)}<select class="modifier-dropdown" name="modifier-group-${groupIndex}" data-single-choice ${group.required ? 'data-required="true" required' : ""}><option value="">${group.required ? "Seleccioná una opción" : "Sin selección"}</option>${options}</select></label>` : options;
+    return `<fieldset class="modifier-selection" ${wrapperAttributes}><legend>${escapeHtml(group.name)}<small>${group.required ? "Obligatorio" : "Opcional"}</small></legend>${conditionHint}${group.name === "Acompañamientos" && !group.included_quantity ? `<p class="included-summary">Se cobra cada acompañamiento desde la primera unidad. Cantidades por café.</p>` : ""}${group.included_quantity ? `<p class="included-summary">${group.included_quantity} acompañamientos incluidos por combo. Los primeros dos que elegís están incluidos; los siguientes se cobran al precio de cada opción.<strong data-included-summary></strong></p>` : ""}${group.selection === "single" ? singleChoice : `<div class="quantity-options">${options}</div>`}</fieldset>`;
   }).join("");
   const quantityField = unitProduct ? "" : `<label class="dialog-field">Cantidad<div class="quantity-stepper"><button class="quantity-step" type="button" data-quantity-step="-1" aria-label="Menos">−</button><input name="quantity" type="number" min="1" max="99" value="${item?.quantity ?? 1}" inputmode="none" readonly required><button class="quantity-step" type="button" data-quantity-step="1" aria-label="Más">＋</button></div></label>`;
   const body = `<div class="customize-hero">${productArt(dish)}<div><p class="eyebrow">${escapeHtml(dish.category)}</p><h3>${escapeHtml(dish.name)}</h3><p>${escapeHtml(dish.description || "Preparado a tu gusto")}</p><strong data-product-price>${dish.modifier_groups?.some((group) => group.name === "Tamaño") ? "Desde " : ""}${money(dish.price)}</strong></div></div>${quantityField}<p class="dialog-hint">${unitProduct ? "Elegí cuántas unidades de cada opción · cada una se cobra al precio del producto." : item ? "Los cambios se actualizarán también en cocina." : "Usá − y ＋ para elegir cuántas unidades querés agregar."}${unitProduct && item ? " Los cambios se actualizarán también en cocina." : ""}</p>${modifierFields}<label class="priority-field"><input name="priority" type="checkbox" ${item?.priority ? "checked" : ""}><span>Prioridad</span><small>Producto rápido de preparar</small></label><label class="dialog-field">Nota para cocina<textarea name="note" maxlength="160" placeholder="Ej.: sin azúcar, bien tostado">${escapeHtml(item?.note || "")}</textarea></label>`;
@@ -807,7 +837,7 @@ function syncConditionalModifierGroups() {
   const selectedByGroup = new Map();
   wrappers.forEach((wrapper) => {
     const chosen = [];
-    const singleChoice = wrapper.querySelector("[data-single-choice]:checked");
+    const singleChoice = wrapper.querySelector("[data-single-choice]");
     if (singleChoice && singleChoice.value) chosen.push(singleChoice.value);
     wrapper.querySelectorAll("[data-quantity-choice]").forEach((input) => {
       const quantity = Number(input.value) || 0;
@@ -845,7 +875,7 @@ function syncConditionalModifierGroups() {
     }
     wrapper.hidden = true;
     wrapper.dataset.visible = "false";
-    wrapper.querySelectorAll("[data-single-choice]").forEach((input) => { input.required = false; input.checked = false; });
+    wrapper.querySelectorAll("[data-single-choice]").forEach((input) => { input.required = false; input.value = ""; });
     wrapper.querySelectorAll("[data-quantity-choice]").forEach((input) => { input.value = "0"; });
   });
 }
@@ -870,7 +900,7 @@ function updateProductPreview() {
     const group = dish.modifier_groups[groupIndex];
     const selected = [];
     const included = includedChoices(wrapper, group);
-    const choice = wrapper.querySelector("[data-single-choice]:checked");
+    const choice = wrapper.querySelector("[data-single-choice]");
     if (choice?.value) {
       const price = Number(group.options.find((option) => option.name === choice.value)?.price || 0);
       selected.push({ quantity: 1, price });
@@ -1005,6 +1035,7 @@ appRoot.addEventListener("click", async (event) => {
   const tableId = actionButton.dataset.tableId;
   if (actionButton.dataset.action === "add-table") showAddTableDialog();
   if (actionButton.dataset.action === "add-product") showProductDialog();
+  if (actionButton.dataset.action === "edit-catalog") showCatalogDialog();
   if (actionButton.dataset.action === "edit-product") {
     const dish = state.menu.find((entry) => entry.id === actionButton.dataset.menuId);
     if (dish) showProductDialog(dish);
