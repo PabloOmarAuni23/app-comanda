@@ -45,3 +45,14 @@ body:has(.trial-stations) #readyNotice { display: none !important; }
 
 .role-profile-grid { width: min(960px, 100%); grid-template-columns: repeat(3, minmax(0, 1fr)); }
 @media (max-width: 700px) { .role-profile-grid { grid-template-columns: 1fr; } }
+
+.trial-banner { color: #654c00; background: #fff4cb; border-color: #e6d38b; }
+.trial-banner a { color: #654c00; }
+.station-part, .production-summary, .summary-disclosure { color: var(--ink); background: #fff; border-color: var(--line); }
+.station-part-head, .summary-disclosure > summary { color: #17603a; }
+.trial-wait, .trial-coordination, .production-summary > p, .summary-task small, .trial-extra { color: #58655e; }
+.summary-task > strong, .trial-product h3 span { color: #17603a; }
+.summary-note, .ticket-note { color: #765600; background: #fff5d8; }
+.part-ready { color: #17603a; background: #e1f3e9; border-color: #b9dfc7; }
+.part-done { color: #17603a; }
+.other-station { color: #725900; }

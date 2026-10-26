@@ -285,4 +285,38 @@
 .kiosk-product { box-shadow: 0 4px 14px rgba(33,53,41,.08); }
 .kiosk-product:hover { border-color: #16845a; background: #f7faf8; }
 .kiosk-cart { box-shadow: 0 8px 28px rgba(33,53,41,.10); }
+.kiosk-product-copy > strong { color: #202a25; }
+.kiosk-product-copy > small, .kiosk-product-copy > span:not(.kiosk-product-bottom) { color: #58655e; }
+.kiosk-cart .eyebrow, .cart-symbol { color: #16845a; }
+.cart-progress { color: #58655e; border-color: #d9e0db; }
+.cart-progress .current { color: #17603a; }
+.cart-footer { color: var(--ink); background: #f4f7f4; border-color: var(--line); }
+.cart-total small, .cart-footnote { color: #58655e; }
+.product-dialog { color: var(--ink); background: #fff; border-color: var(--line); }
+.product-dialog .dialog-actions { background: #fff; border-color: var(--line); }
+.product-dialog .modifier-selection { color: var(--ink); background: #fff; border-color: var(--line); }
+.product-dialog .modifier-selection legend { color: var(--ink); }
+.modifier-selection legend small { color: #58655e; background: #edf3ee; }
+.product-dialog .modifier-card { color: var(--ink); background: #fff; border-color: var(--line); }
+.product-dialog .modifier-card.selected { background: #eaf5ed; border-color: #16845a; }
+.product-dialog .modifier-card-copy, .product-dialog .included-summary { color: #58655e; }
+.product-dialog .included-summary strong { color: #17603a; background: #e1f3e9; }
+.product-dialog .quantity-step { color: #17603a; background: #e1f3e9; border-color: #b9dfc7; }
+.product-dialog .quantity-stepper input { color: var(--ink); background: #fff; border-color: var(--line); }
+.product-dialog .dialog-actions .button-primary { color: #fff; background: #16845a; }
+.kitchen-ticket { color: var(--ink); background: #fff; border-color: var(--line); }
+.kitchen-ticket .ticket-head { color: var(--ink); background: #f3f6f3; }
+.kitchen-ticket .ticket-head.ticket-on-time { color: #174c31; background: #dff4e8; }
+.kitchen-ticket .ticket-head.ticket-delayed { color: #594500; background: #fff2c7; }
+.kitchen-ticket .ticket-head.ticket-very-late { color: #693510; background: #ffe6d3; }
+.kitchen-ticket .ticket-head.ticket-cancel-risk { color: #70241e; background: #fbe1df; }
+.kitchen-ticket .ticket-item, .kitchen-ticket .ticket-item:nth-child(even) { color: var(--ink); background: #fff; border-color: var(--line); }
+.kitchen-ticket .ticket-item:nth-child(even) { background: #f7f9f7; }
+.kitchen-ticket .ticket-item-quantity { color: #17603a; background: #e1f3e9; }
+.kitchen-ticket .ticket-footer { color: var(--ink); background: #f7f9f7; border-color: var(--line); }
+.kitchen-ticket .kitchen-state-select, .kitchen-ticket .kitchen-advance { color: var(--ink); background: #fff; border-color: var(--line); }
+.kitchen-ticket .kitchen-overview { color: #58655e; }
+.kitchen-ticket .priority-toggle, .kitchen-ticket .priority-badge { color: #75400b; background: #fff0df; }
+.kitchen-ticket .ticket-product-meta { color: #58655e; }
+.kitchen-ticket .ticket-product-meta b { color: #75400b; background: #fff0df; }
 

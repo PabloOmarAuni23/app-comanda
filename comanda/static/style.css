@@ -477,6 +477,13 @@ h1, h2, h3 { font-family: 'Manrope', 'Avenir Next', sans-serif; }
 .ticket-modifiers { color: #17603a; background: #e6f5eb; }
 .ticket-note { color: #765600; background: #fff5d8; }
 .storage-warning { color: #812b24; background: #fbe5e2; }
+.home-grid .order-row.ready-order { color: #174c31; background: #e1f3e9 !important; }
+.table-pickup-notice { color: #653d0c; background: #fff2dc; border-color: #e9c58f; }
+.table-pickup-notice > span { color: #75400b; }
+.priority-badge { color: #75400b; background: #fff0df; }
+.priority-toggle { color: #75400b; }
+.flow-preparing { color: #654c00; background: #fff4cb; border-color: #e6d38b; }
+.sound-button.sound-needs-tap { color: #654c00; background: #fff4cb; }
 .toast { color: #fff; }
 .modifier-option input, .modifier-selection input { accent-color: var(--green); }
 .modifier-dropdown-label { margin: 12px 0 2px; }
@@ -491,3 +498,41 @@ h1, h2, h3 { font-family: 'Manrope', 'Avenir Next', sans-serif; }
 @media (max-width: 760px) { .shift-badge { padding: 4px 8px; font-size: 11px; } }
 .storage-warning { display: grid; gap: 4px; margin: 0 0 16px; padding: 12px 15px; border: 1px solid #8a2e24; border-radius: 7px; color: #ffb4aa; background: #2e120f; font-size: 13px; }
 .storage-warning strong { font-size: 14px; }
+
+/* Contraste de la paleta clara en paneles y estados que conservaban fondos oscuros. */
+.stats { color: var(--ink); background: #fff; }
+.stat { background: #fff; }
+.stat-label, .stat-sub { color: #58655e; }
+.stat-value { color: #202a25; }
+.stat-value.accent, .eyebrow { color: #a84d0d; }
+.home-grid .order-row { color: var(--ink); background: #fff; }
+.home-grid .order-row:hover { background: #f5f8f5; }
+.mini-table.occupied { color: #653d0c; background: #fff2dc; border-color: #e9c58f; }
+.status.open, .status.draft, .status.sent { color: #75400b; background: #fff0df; }
+.status.cleaning, .status.suspended { color: #654c00; background: #fff4cb; }
+.status.ready { color: #17603a; background: #e1f3e9; }
+.order-clock, .order-clock.clock-on-time, .order-clock.clock-delayed,
+.order-clock.clock-very-late, .order-clock.clock-critical { color: #33413a; background: #f5f7f5; border-color: #d4ddd7; }
+.ticket-on-time, .kitchen-timer.ticket-on-time, .legend-on-time { color: #17603a; background: #e1f3e9; }
+.ticket-delayed, .kitchen-timer.ticket-delayed, .legend-delayed { color: #725900; background: #fff4cd; }
+.ticket-very-late, .kitchen-timer.ticket-very-late, .legend-very-late { color: #7a3c12; background: #ffeadb; }
+.ticket-cancel-risk, .kitchen-timer.ticket-cancel-risk, .legend-cancel-risk { color: #812b24; background: #fbe5e2; }
+.kitchen-ticket { color: var(--ink); background: #fff; border-color: var(--line); }
+.kitchen-ticket .ticket-head { color: var(--ink); background: #f3f6f3; }
+.kitchen-ticket .ticket-head.ticket-on-time { color: #174c31; background: #dff4e8; }
+.kitchen-ticket .ticket-head.ticket-delayed { color: #594500; background: #fff2c7; }
+.kitchen-ticket .ticket-head.ticket-very-late { color: #693510; background: #ffe6d3; }
+.kitchen-ticket .ticket-head.ticket-cancel-risk { color: #70241e; background: #fbe1df; }
+.kitchen-ticket .ticket-item, .kitchen-ticket .ticket-item:nth-child(even) { color: var(--ink); background: #fff; border-color: var(--line); }
+.kitchen-ticket .ticket-item:nth-child(even) { background: #f7f9f7; }
+.kitchen-ticket .ticket-item-quantity { color: #17603a; background: #e1f3e9; }
+.kitchen-ticket .ticket-footer { color: var(--ink); background: #f7f9f7; border-color: var(--line); }
+.kitchen-ticket .kitchen-state-select, .kitchen-ticket .kitchen-advance { color: var(--ink); background: #fff; border-color: var(--line); }
+.kitchen-ticket .kitchen-item-name, .kitchen-ticket .ticket-product strong { color: var(--ink); }
+.kitchen-overview { color: #58655e; }
+.kitchen-filter { color: #33413a; background: #fff; border-color: var(--line); }
+.kitchen-filter.ticket-on-time { color: #17603a; background: #e1f3e9; }
+.kitchen-filter.ticket-delayed { color: #725900; background: #fff4cd; }
+.kitchen-filter.ticket-very-late { color: #7a3c12; background: #ffeadb; }
+.kitchen-filter.ticket-cancel-risk { color: #812b24; background: #fbe5e2; }
+.storage-warning { color: #812b24; background: #fbe5e2; }
