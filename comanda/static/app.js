@@ -492,12 +492,8 @@ function groupKitchenItems(items) {
     if (!products.has(productKey)) products.set(productKey, { name: item.name, quantity: 0, variants: new Map() });
     const product = products.get(productKey);
     product.quantity += Number(item.quantity) || 0;
-    const modifiers = (item.modifiers || []).map((entry) => ({
-      group: String(entry.group || ""), name: String(entry.name || ""), quantity: Number(entry.quantity) || 1,
-      included_quantity: Number(entry.included_quantity) || 0,
-    })).sort((left, right) => `${left.group}:${left.name}`.localeCompare(`${right.group}:${right.name}`, "es"));
     const production = Object.entries(item.production || {}).map(([name, part]) => [name, part.status]).sort(([left], [right]) => left.localeCompare(right));
-    const variantKey = JSON.stringify([item.status, Boolean(item.priority), item.note || "", modifiers, production]);
+    const variantKey = JSON.stringify([item.status, Boolean(item.priority), item.note || "", production]);
     if (!product.variants.has(variantKey)) product.variants.set(variantKey, { item, items: [], quantity: 0, sentAt: item.sent_at });
     const variant = product.variants.get(variantKey);
     variant.items.push(item);
@@ -519,9 +515,9 @@ function renderKitchenVariant(variant, table) {
   for (const source of variant.items) {
     for (const modifier of source.modifiers || []) {
       const key = `${modifier.group || ""}\u0000${modifier.name}`;
-      const quantity = Number(modifier.quantity) || 1;
+      const quantity = (Number(modifier.quantity) || 1) * (source.unit_mode ? 1 : Number(source.quantity) || 1);
       const existing = modifiers.get(key) || { group: modifier.group || "", name: modifier.name, quantity: 0 };
-      existing.quantity = Math.max(existing.quantity, quantity);
+      existing.quantity += quantity;
       modifiers.set(key, existing);
     }
   }
@@ -535,7 +531,7 @@ function renderKitchenVariant(variant, table) {
   const priorityToggle = `<label class="priority-toggle"><input type="checkbox" data-action="item-priority" data-table-id="${escapeHtml(table.id)}" data-item-ids="${itemIdsAttribute}" ${item.priority ? "checked" : ""}><span>Prioridad</span></label>`;
   const editButton = `<button class="kitchen-advance" type="button" title="Editar una l\u00ednea de este grupo" aria-label="Editar una l\u00ednea de ${escapeHtml(item.name)}" data-action="item-edit" data-table-id="${escapeHtml(table.id)}" data-item-id="${escapeHtml(item.id)}">Editar</button>`;
   const cancelButton = `<button class="kitchen-advance kitchen-cancel" type="button" title="Cancelar este grupo" aria-label="Cancelar ${variant.quantity} de ${escapeHtml(item.name)}" data-action="item-cancel-group" data-table-id="${escapeHtml(table.id)}" data-item-ids="${itemIdsAttribute}" data-name="${escapeHtml(item.name)}" data-quantity="${variant.quantity}">Cancelar grupo</button>`;
-  return `<div class="kitchen-variant ${item.priority ? "ticket-priority" : ""}"><div class="kitchen-variant-copy"><div class="ticket-product-meta"><span class="kitchen-variant-quantity">${variant.quantity} &#215;</span><span class="status ${item.status}">${statusLabel(item.status)}</span><span class="${timing.className}">${kitchenSentTime(variant.sentAt)} &#183; ${timing.minutes} min</span>${item.priority ? "<b>Prioridad</b>" : ""}</div>${modifierLines.length ? `<p class="ticket-modifiers">${modifierLines.join("<br>")}</p>` : ""}${item.note ? `<p class="ticket-note"><b>Nota:</b> ${escapeHtml(item.note)}</p>` : ""}</div><div class="kitchen-variant-controls">${statusControls}<div class="ticket-item-tools">${priorityToggle}${editButton}${cancelButton}</div></div></div>`;
+  return `<div class="kitchen-variant ${item.priority ? "ticket-priority" : ""}"><div class="kitchen-variant-copy"><div class="ticket-product-meta"><span class="status ${item.status}">${statusLabel(item.status)}</span><span class="${timing.className}">${kitchenSentTime(variant.sentAt)} &#183; ${timing.minutes} min</span>${item.priority ? "<b>Prioridad</b>" : ""}</div>${modifierLines.length ? `<p class="ticket-modifiers">${modifierLines.join("<br>")}</p>` : ""}${item.note ? `<p class="ticket-note"><b>Nota:</b> ${escapeHtml(item.note)}</p>` : ""}</div><div class="kitchen-variant-controls">${statusControls}<div class="ticket-item-tools">${priorityToggle}${editButton}${cancelButton}</div></div></div>`;
 }
 
 function renderKitchen() {
