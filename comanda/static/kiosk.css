@@ -320,3 +320,28 @@
 .kitchen-ticket .ticket-product-meta { color: #58655e; }
 .kitchen-ticket .ticket-product-meta b { color: #75400b; background: #fff0df; }
 
+
+
+/* Comanda agrupada para lectura rapida en cocina. */
+.kitchen-product-group { display:block; padding:14px 16px; }
+.kitchen-product-group > .ticket-product { display:flex; align-items:center; gap:11px; padding-bottom:11px; border-bottom:1px solid var(--line); }
+.kitchen-product-group > .ticket-product .ticket-item-quantity { flex:0 0 auto; min-width:42px; padding:5px 8px; border-radius:7px; text-align:center; font-size:18px; }
+.kitchen-variant-count { display:block; margin-top:3px; color:#58655e; font-size:11px; }
+.kitchen-product-variants { display:grid; }
+.kitchen-variant { display:grid; grid-template-columns:minmax(0,1fr) minmax(210px,34%); gap:14px; align-items:center; padding:11px 0; border-bottom:1px solid #e8ede9; }
+.kitchen-variant:last-child { border-bottom:0; }
+.kitchen-variant-copy { min-width:0; }
+.kitchen-variant-copy .ticket-product-meta { margin:0; }
+.kitchen-variant-quantity { display:inline-flex; align-items:center; justify-content:center; min-width:32px; color:#17603a; background:#e1f3e9; font-weight:800; }
+.kitchen-variant-copy .ticket-modifiers, .kitchen-variant-copy .ticket-note { margin:7px 0 0; padding:5px 8px; font-size:13px; line-height:1.5; }
+.kitchen-variant-controls { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:7px; align-items:center; }
+.kitchen-variant-controls .kitchen-advance { width:auto; min-width:78px; padding:0 10px; }
+.kitchen-variant-controls .ticket-item-tools { grid-column:1 / -1; display:flex; justify-content:flex-start; flex-wrap:wrap; gap:6px; padding:0; }
+.kitchen-variant-controls .ticket-item-tools .kitchen-advance { width:auto; min-width:36px; min-height:34px; height:34px; }
+.kitchen-variant-controls .priority-toggle { margin-right:auto; }
+.kitchen-ticket .kitchen-cancel { color:#812b24; background:#fbe5e2; border-color:#e8b9b4; }
+@media(max-width:680px) {
+ .kitchen-variant { grid-template-columns:1fr; gap:8px; }
+ .kitchen-variant-controls { grid-template-columns:minmax(0,1fr) auto; }
+ .kitchen-product-group { padding:12px; }
+}

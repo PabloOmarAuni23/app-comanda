@@ -485,6 +485,59 @@ function kitchenSentTime(timestamp) {
     : "--:--";
 }
 
+function groupKitchenItems(items) {
+  const products = new Map();
+  for (const item of items) {
+    const productKey = String(item.menu_id || item.name).toLocaleLowerCase();
+    if (!products.has(productKey)) products.set(productKey, { name: item.name, quantity: 0, variants: new Map() });
+    const product = products.get(productKey);
+    product.quantity += Number(item.quantity) || 0;
+    const modifiers = (item.modifiers || []).map((entry) => ({
+      group: String(entry.group || ""), name: String(entry.name || ""), quantity: Number(entry.quantity) || 1,
+      included_quantity: Number(entry.included_quantity) || 0,
+    })).sort((left, right) => `${left.group}:${left.name}`.localeCompare(`${right.group}:${right.name}`, "es"));
+    const production = Object.entries(item.production || {}).map(([name, part]) => [name, part.status]).sort(([left], [right]) => left.localeCompare(right));
+    const variantKey = JSON.stringify([item.status, Boolean(item.priority), item.note || "", modifiers, production]);
+    if (!product.variants.has(variantKey)) product.variants.set(variantKey, { item, items: [], quantity: 0, sentAt: item.sent_at });
+    const variant = product.variants.get(variantKey);
+    variant.items.push(item);
+    variant.quantity += Number(item.quantity) || 0;
+    if ((Date.parse(item.sent_at || "") || Infinity) < (Date.parse(variant.sentAt || "") || Infinity)) variant.sentAt = item.sent_at;
+  }
+  return [...products.values()].map((product) => ({
+    ...product,
+    variants: [...product.variants.values()].sort((left, right) => Number(Boolean(right.item.priority)) - Number(Boolean(left.item.priority)) || (Date.parse(left.sentAt || "") || 0) - (Date.parse(right.sentAt || "") || 0)),
+  })).sort((left, right) => Number(Boolean(right.variants.some((variant) => variant.item.priority))) - Number(Boolean(left.variants.some((variant) => variant.item.priority))));
+}
+
+function renderKitchenVariant(variant, table) {
+  const item = variant.item;
+  const itemIds = variant.items.map((entry) => entry.id);
+  const itemIdsAttribute = escapeHtml(JSON.stringify(itemIds));
+  const timing = kitchenTiming(variant.sentAt);
+  const modifiers = new Map();
+  for (const source of variant.items) {
+    for (const modifier of source.modifiers || []) {
+      const key = `${modifier.group || ""}\u0000${modifier.name}`;
+      const quantity = Number(modifier.quantity) || 1;
+      const existing = modifiers.get(key) || { group: modifier.group || "", name: modifier.name, quantity: 0 };
+      existing.quantity = Math.max(existing.quantity, quantity);
+      modifiers.set(key, existing);
+    }
+  }
+  const modifierLines = [...modifiers.values()].map((modifier) => `${modifier.group ? `${escapeHtml(modifier.group)}: ` : ""}${modifier.quantity > 1 ? `${modifier.quantity} &#215; ` : ""}${escapeHtml(modifier.name)}`);
+  const options = item.status === "sent" ? [["sent", "Pendiente"], ["preparing", "En preparaci\u00f3n"], ["ready", "Terminado"], ["suspended", "Demorado"]]
+    : item.status === "preparing" ? [["preparing", "En preparaci\u00f3n"], ["ready", "Terminado"], ["suspended", "Demorado"]]
+      : [["suspended", "Demorado"], ["preparing", "En preparaci\u00f3n"], ["ready", "Terminado"]];
+  const optionMarkup = options.map(([value, label]) => `<option value="${value}" ${item.status === value ? "selected" : ""}>${label}</option>`).join("");
+  const nextStatus = item.status === "preparing" ? "ready" : "preparing";
+  const statusControls = `<select class="kitchen-state-select" aria-label="Estado de ${escapeHtml(item.name)}" data-action="item-status-select" data-table-id="${escapeHtml(table.id)}" data-item-ids="${itemIdsAttribute}">${optionMarkup}</select><button class="kitchen-advance" type="button" aria-label="${nextStatus === "preparing" ? "Empezar" : "Terminar"} ${escapeHtml(item.name)}" data-action="item-status" data-table-id="${escapeHtml(table.id)}" data-item-ids="${itemIdsAttribute}" data-status="${nextStatus}">${nextStatus === "preparing" ? "Empezar" : "Terminar"}</button>`;
+  const priorityToggle = `<label class="priority-toggle"><input type="checkbox" data-action="item-priority" data-table-id="${escapeHtml(table.id)}" data-item-ids="${itemIdsAttribute}" ${item.priority ? "checked" : ""}><span>Prioridad</span></label>`;
+  const editButton = `<button class="kitchen-advance" type="button" title="Editar una l\u00ednea de este grupo" aria-label="Editar una l\u00ednea de ${escapeHtml(item.name)}" data-action="item-edit" data-table-id="${escapeHtml(table.id)}" data-item-id="${escapeHtml(item.id)}">Editar</button>`;
+  const cancelButton = `<button class="kitchen-advance kitchen-cancel" type="button" title="Cancelar este grupo" aria-label="Cancelar ${variant.quantity} de ${escapeHtml(item.name)}" data-action="item-cancel-group" data-table-id="${escapeHtml(table.id)}" data-item-ids="${itemIdsAttribute}" data-name="${escapeHtml(item.name)}" data-quantity="${variant.quantity}">Cancelar grupo</button>`;
+  return `<div class="kitchen-variant ${item.priority ? "ticket-priority" : ""}"><div class="kitchen-variant-copy"><div class="ticket-product-meta"><span class="kitchen-variant-quantity">${variant.quantity} &#215;</span><span class="status ${item.status}">${statusLabel(item.status)}</span><span class="${timing.className}">${kitchenSentTime(variant.sentAt)} &#183; ${timing.minutes} min</span>${item.priority ? "<b>Prioridad</b>" : ""}</div>${modifierLines.length ? `<p class="ticket-modifiers">${modifierLines.join("<br>")}</p>` : ""}${item.note ? `<p class="ticket-note"><b>Nota:</b> ${escapeHtml(item.note)}</p>` : ""}</div><div class="kitchen-variant-controls">${statusControls}<div class="ticket-item-tools">${priorityToggle}${editButton}${cancelButton}</div></div></div>`;
+}
+
 function renderKitchen() {
   const tickets = state.tables.filter((table) => table.status === "open" && table.items.some((item) => ["sent", "preparing", "suspended"].includes(item.status)));
   tickets.sort((left, right) => {
@@ -496,32 +549,17 @@ function renderKitchen() {
     return leftSentAt - rightSentAt;
   });
   const activeItems = tickets.flatMap((table) => table.items.filter((item) => ["sent", "preparing", "suspended"].includes(item.status)).map((item) => ({ table, item, timing: kitchenTiming(item.sent_at) })));
-  const countFor = (className) => activeItems.filter(({ timing }) => timing.className === className).length;
-  const filters = [["all", "Todos", activeItems.length], ["ticket-on-time", "A tiempo", countFor("ticket-on-time")], ["ticket-delayed", "Demorado", countFor("ticket-delayed")], ["ticket-very-late", "Muy demorado", countFor("ticket-very-late")], ["ticket-cancel-risk", "Crítico", countFor("ticket-cancel-risk")]]
+  const countFor = (className) => activeItems.filter(({ timing }) => timing.className === className).reduce((sum, { item }) => sum + item.quantity, 0);
+  const filters = [["all", "Todos", activeItems.reduce((sum, { item }) => sum + item.quantity, 0)], ["ticket-on-time", "A tiempo", countFor("ticket-on-time")], ["ticket-delayed", "Demorado", countFor("ticket-delayed")], ["ticket-very-late", "Muy demorado", countFor("ticket-very-late")], ["ticket-cancel-risk", "Crítico", countFor("ticket-cancel-risk")]]
     .map(([key, label, amount]) => `<button class="kitchen-filter ${key === kitchenTimingFilter ? "active" : ""} ${key === "all" ? "" : key}" data-kitchen-filter="${key}" type="button">${label} <span>${amount}</span></button>`).join("");
   const cards = tickets.map((table) => {
     const items = table.items.filter((item) => ["sent", "preparing", "suspended"].includes(item.status)).sort((left, right) => Number(Boolean(right.priority)) - Number(Boolean(left.priority)) || (Date.parse(left.sent_at || "") || 0) - (Date.parse(right.sent_at || "") || 0));
     const oldestItem = items.reduce((oldest, item) => (Date.parse(item.sent_at || "") || 0) < (Date.parse(oldest.sent_at || "") || 0) ? item : oldest);
     const timing = kitchenTiming(oldestItem.sent_at);
     if (kitchenTimingFilter !== "all" && !items.some((item) => kitchenTiming(item.sent_at).className === kitchenTimingFilter)) return "";
-    const renderedItems = items.map((item) => {
-      const options = item.status === "sent" ? [["sent", "Pendiente"], ["preparing", "En preparación"], ["ready", "Terminado"], ["suspended", "Demorado"]] : item.status === "preparing" ? [["preparing", "En preparación"], ["ready", "Terminado"], ["suspended", "Demorado"]] : [["suspended", "Demorado"], ["preparing", "En preparación"], ["ready", "Terminado"]];
-      const optionMarkup = options.map(([value, label]) => `<option value="${value}" ${item.status === value ? "selected" : ""}>${label}</option>`).join("");
-      const modifierLines = itemModifierLines(item);
-      const itemTiming = kitchenTiming(item.sent_at);
-      const nextStatus = item.status === "preparing" ? "ready" : "preparing";
-      const nextLabel = nextStatus === "preparing" ? "Empezar" : "Terminar producto";
-      const priorityToggle = `<label class="priority-toggle"><input type="checkbox" data-action="item-priority" data-table-id="${escapeHtml(table.id)}" data-item-id="${escapeHtml(item.id)}" ${item.priority ? "checked" : ""}><span>Prioridad</span></label>`;
-      const isCanceled = item.status === "canceled";
-      const hasEditableControls = !isCanceled && (item.status === "sent" || item.status === "preparing" || item.status === "suspended" || item.status === "ready");
-      const editButton = `<button class="kitchen-advance" type="button" title="Editar pedido" aria-label="Editar ${escapeHtml(item.name)}" data-action="item-edit" data-table-id="${escapeHtml(table.id)}" data-item-id="${escapeHtml(item.id)}">✎</button>`;
-      const cancelButton = `<button class="kitchen-advance kitchen-cancel" type="button" title="Cancelar pedido" aria-label="Cancelar ${escapeHtml(item.name)}" data-action="item-cancel" data-table-id="${escapeHtml(table.id)}" data-item-id="${escapeHtml(item.id)}">✕</button>`;
-      const statusControls = isCanceled
-        ? `<span class="status canceled">Cancelado</span>`
-        : `<select class="kitchen-state-select" aria-label="Estado de ${escapeHtml(item.name)}" data-action="item-status-select" data-table-id="${escapeHtml(table.id)}" data-item-id="${escapeHtml(item.id)}">${optionMarkup}</select><button class="kitchen-advance" type="button" title="${nextLabel}" aria-label="${nextLabel}" data-action="item-status" data-table-id="${escapeHtml(table.id)}" data-item-id="${escapeHtml(item.id)}" data-status="${nextStatus}">${nextStatus === "preparing" ? "Empezar" : "Terminar"}</button>`;
-      return `<article class="ticket-item ${item.priority ? "ticket-priority" : ""} ${isCanceled ? "ticket-canceled" : ""}"><div class="ticket-product"><span class="ticket-item-quantity">${item.quantity}×</span><div><strong>${escapeHtml(item.name)}</strong><div class="ticket-product-meta"><span>${statusLabel(item.status)}</span><span class="${itemTiming.className}">${kitchenSentTime(item.sent_at)} · ${itemTiming.minutes} min</span>${item.priority ? `<b>Prioridad</b>` : ""}</div>${modifierLines.length ? `<p class="ticket-modifiers">${modifierLines.join("<br>")}</p>` : ""}${item.note ? `<p class="ticket-note"><b>Nota:</b> ${escapeHtml(item.note)}</p>` : ""}</div></div><div class="ticket-item-controls">${statusControls}</div>${isCanceled ? "" : `<div class="ticket-item-tools">${priorityToggle}${hasEditableControls ? editButton + cancelButton : ""}</div>`}</article>`;
-    }).join("");
-    return `<section class="kitchen-ticket"><header class="ticket-head ${timing.className}"><div class="ticket-heading-main"><div class="ticket-heading-top"><span class="ticket-sent-time">${kitchenSentTime(oldestItem.sent_at)}</span><span class="kitchen-timer" role="timer" aria-label="Pedido hace ${timing.minutes} minutos: ${timing.label}"><strong>${timing.minutes} min</strong></span></div><h2>${escapeHtml(table.name)}</h2><p>${escapeHtml(tableZone(table))} · Atiende ${escapeHtml(table.opened_by)}${guestsSuffix(table)}</p></div><span class="status open">${items.length} prod.</span></header><div class="ticket-items">${renderedItems}</div><footer class="ticket-footer"><span class="ticket-footer-meta">${items.reduce((sum, item) => sum + item.quantity, 0)} unidades pendientes</span><button class="button button-finish-all" data-action="finish-ticket" data-table-id="${escapeHtml(table.id)}">Terminar todo</button></footer></section>`;
+    const groupedProducts = groupKitchenItems(items);
+    const renderedItems = groupedProducts.map((product) => `<article class="ticket-item kitchen-product-group"><div class="ticket-product"><span class="ticket-item-quantity">${product.quantity} &#215;</span><div><strong>${escapeHtml(product.name)}</strong><small class="kitchen-variant-count">${product.variants.length} variantes</small></div></div><div class="kitchen-product-variants">${product.variants.map((variant) => renderKitchenVariant(variant, table)).join("")}</div></article>`).join("");
+    return `<section class="kitchen-ticket"><header class="ticket-head ${timing.className}"><div class="ticket-heading-main"><div class="ticket-heading-top"><span class="ticket-sent-time">${kitchenSentTime(oldestItem.sent_at)}</span><span class="kitchen-timer" role="timer" aria-label="Pedido hace ${timing.minutes} minutos: ${timing.label}"><strong>${timing.minutes} min</strong></span></div><h2>${escapeHtml(table.name)}</h2><p>${escapeHtml(tableZone(table))} · Atiende ${escapeHtml(table.opened_by)}${guestsSuffix(table)}</p></div><span class="status open">${groupedProducts.length} productos &#183; ${items.reduce((sum, item) => sum + item.quantity, 0)} unidades</span></header><div class="ticket-items">${renderedItems}</div><footer class="ticket-footer"><span class="ticket-footer-meta">${items.reduce((sum, item) => sum + item.quantity, 0)} unidades pendientes</span><button class="button button-finish-all" data-action="finish-ticket" data-table-id="${escapeHtml(table.id)}">Terminar todo</button></footer></section>`;
   }).join("");
   const readyCount = state.tables.reduce((sum, table) => sum + table.items.filter((item) => item.status === "ready").length, 0);
   appRoot.innerHTML = `<div class="kitchen-board-heading"><div><p class="eyebrow">Producción</p><h1>Cocina</h1><p class="kitchen-overview">${tickets.length} mesas · ${activeItems.reduce((sum, entry) => sum + entry.item.quantity, 0)} unidades pendientes · prioridades y pedidos más antiguos primero</p></div><span class="status ready">${readyCount} listos</span></div><div class="kitchen-toolbar" aria-label="Filtrar comandas">${filters}</div><div class="kitchen-grid">${cards || `<section class="section-panel kitchen-empty"><div class="empty-state"><div class="empty-mark">♨</div><h2>${activeItems.length ? "No hay pedidos en este filtro" : "Cocina al día"}</h2><p>${activeItems.length ? "Elegí otro tiempo para ver las comandas." : "Los pedidos enviados por los mozos van a aparecer acá."}</p></div></section>`}</div>`;
@@ -979,7 +1017,7 @@ appRoot.addEventListener("input", (event) => {
 appRoot.addEventListener("change", async (event) => {
   const statusSelect = event.target.closest("select[data-action=\"item-status-select\"]");
   if (!statusSelect) return;
-  await sendAction({ type: "item_status", table_id: statusSelect.dataset.tableId, item_id: statusSelect.dataset.itemId, status: statusSelect.value });
+  await sendAction({ type: "item_status_bulk", table_id: statusSelect.dataset.tableId, item_ids: JSON.parse(statusSelect.dataset.itemIds || "[]"), status: statusSelect.value });
 });
 
 appRoot.addEventListener("click", async (event) => {
@@ -1023,9 +1061,9 @@ appRoot.addEventListener("click", async (event) => {
   const priorityInput = event.target.closest('input[data-action="item-priority"]');
   if (priorityInput) {
     await sendAction({
-      type: "item_priority",
+      type: "item_priority_bulk",
       table_id: priorityInput.dataset.tableId,
-      item_id: priorityInput.dataset.itemId,
+      item_ids: JSON.parse(priorityInput.dataset.itemIds || "[]"),
       priority: priorityInput.checked,
     }, priorityInput.checked ? "Pedido marcado como prioridad." : "Prioridad quitada.");
     return;
@@ -1071,10 +1109,14 @@ appRoot.addEventListener("click", async (event) => {
     const nextStatus = item.status === "canceled" ? "draft" : "canceled";
     await sendAction({ type: "item_status", table_id: tableId, item_id: actionButton.dataset.itemId, status: nextStatus });
   }
+  if (actionButton.dataset.action === "item-cancel-group") {
+    const quantity = Number(actionButton.dataset.quantity) || 0;
+    if (window.confirm(`\u00bfCancelar ${quantity} ${actionButton.dataset.name} de este grupo?`)) await sendAction({ type: "item_status_bulk", table_id: tableId, item_ids: JSON.parse(actionButton.dataset.itemIds || "[]"), status: "canceled" });
+  }
   if (actionButton.dataset.action === "item-edit") {
     openItemEditDialog(tableId, actionButton.dataset.itemId);
   }  if (actionButton.dataset.action === "item-status") {
-    await sendAction({ type: "item_status", table_id: tableId, item_id: actionButton.dataset.itemId, status: actionButton.dataset.status });
+    await sendAction({ type: "item_status_bulk", table_id: tableId, item_ids: JSON.parse(actionButton.dataset.itemIds || "[]"), status: actionButton.dataset.status });
   }
   if (actionButton.dataset.action === "shift-start") {
     const shift = actionButton.dataset.shift;
@@ -1107,10 +1149,7 @@ appRoot.addEventListener("click", async (event) => {
   if (actionButton.dataset.action === "finish-ticket") {
     const table = state.tables.find((entry) => entry.id === tableId);
     const pendingItems = table?.items.filter((item) => ["sent", "preparing", "suspended"].includes(item.status) && item.status !== "canceled") || [];
-    for (const item of pendingItems) {
-      const completed = await sendAction({ type: "item_status", table_id: tableId, item_id: item.id, status: "ready" });
-      if (!completed) break;
-    }
+    if (pendingItems.length) await sendAction({ type: "item_status_bulk", table_id: tableId, item_ids: pendingItems.map((item) => item.id), status: "ready" });
   }
 });
 

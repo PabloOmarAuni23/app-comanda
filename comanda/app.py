@@ -896,6 +896,35 @@ def mutate_state(action):
             else:
                 item.pop("retrieved_at", None)
                 item.pop("retrieved_by", None)
+        elif action_type == "item_status_bulk":
+            table = find_table()
+            item_ids = action.get("item_ids")
+            status = str(action.get("status", ""))
+            if not isinstance(item_ids, list) or not 1 <= len(item_ids) <= 500 or len({str(item_id) for item_id in item_ids}) != len(item_ids):
+                raise ValueError("No se pudo actualizar el grupo de productos.")
+            items_by_id = {item["id"]: item for item in table["items"]}
+            selected_items = [items_by_id.get(str(item_id)) for item_id in item_ids]
+            allowed_status = {
+                "sent": {"preparing", "ready", "suspended", "draft", "canceled"},
+                "preparing": {"ready", "suspended", "draft", "canceled"},
+                "suspended": {"preparing", "ready", "draft", "canceled"},
+                "ready": {"ready", "draft", "canceled"},
+                "draft": {"draft", "canceled"},
+                "canceled": {"draft"},
+            }
+            if any(item is None or status not in allowed_status.get(item["status"], set()) for item in selected_items):
+                raise ValueError("El grupo cambiÃ³. ActualizÃ¡ la cocina antes de continuar.")
+            if status == "ready" and any(item.get("production") and not all(part["status"] == "ready" for part in item["production"].values()) for item in selected_items):
+                raise ValueError("Falta terminar la preparaciÃ³n en barra o cocina.")
+            for item in selected_items:
+                item["status"] = status
+                if status == "ready":
+                    item["ready_at"] = stamp
+                    item.pop("retrieved_at", None)
+                    item.pop("retrieved_by", None)
+                else:
+                    item.pop("retrieved_at", None)
+                    item.pop("retrieved_by", None)
         elif action_type == "item_edit":
             table = find_table()
             item = next((entry for entry in table["items"] if entry["id"] == str(action.get("item_id", ""))), None)
@@ -952,6 +981,17 @@ def mutate_state(action):
             if item is None or item["status"] not in {"sent", "preparing", "suspended"}:
                 raise ValueError("No se pudo actualizar la prioridad del producto.")
             item["priority"] = action.get("priority") is True
+        elif action_type == "item_priority_bulk":
+            table = find_table()
+            item_ids = action.get("item_ids")
+            if not isinstance(item_ids, list) or not 1 <= len(item_ids) <= 500 or len({str(item_id) for item_id in item_ids}) != len(item_ids):
+                raise ValueError("No se pudo actualizar la prioridad del grupo.")
+            items_by_id = {item["id"]: item for item in table["items"]}
+            selected_items = [items_by_id.get(str(item_id)) for item_id in item_ids]
+            if any(item is None or item["status"] not in {"sent", "preparing", "suspended"} for item in selected_items):
+                raise ValueError("El grupo cambiÃ³. ActualizÃ¡ la cocina antes de continuar.")
+            for item in selected_items:
+                item["priority"] = action.get("priority") is True
         elif action_type in {"table_paid", "items_paid"}:
             table = find_table()
             if table["status"] != "open":

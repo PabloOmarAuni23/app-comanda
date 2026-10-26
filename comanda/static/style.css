@@ -536,3 +536,13 @@ h1, h2, h3 { font-family: 'Manrope', 'Avenir Next', sans-serif; }
 .kitchen-filter.ticket-very-late { color: #7a3c12; background: #ffeadb; }
 .kitchen-filter.ticket-cancel-risk { color: #812b24; background: #fbe5e2; }
 .storage-warning { color: #812b24; background: #fbe5e2; }
+
+
+/* Contraste legible en resumenes y controles de todos los perfiles. */
+.stats { color:var(--ink); background:#fff; }
+.stat { color:var(--ink); background:#fff; }
+.stat-label,.stat-sub { color:#58655e; }
+.stat-value { color:#202a25; }
+.home-grid .order-row,.shift-summary div { color:var(--ink); background:#fff; }
+.button-secondary:hover { color:var(--ink); background:#f0f5f1; }
+.dialog-field input,.dialog-field textarea,.dialog-field select { color:var(--ink); background:#fff; }
